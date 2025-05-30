@@ -3,7 +3,7 @@
 **Autores:**
 * João Guilherme de Souza
 * Eduardo Mendes
-* Roger Yoshiaki Motoyoma
+* Roger Yoshiaki Motoyama
 
 ---
 
