@@ -172,7 +172,7 @@ if __name__ == '__main__':
         # 2. Popular as tabelas a partir dos CSVs
         print("\nIniciando povoamento das tabelas a partir de arquivos CSV...")
         # (Você especificou CSVs para estas tabelas)
-        popular_tabela_csv(conn, 'clientes', 'clientes.csv')
+        popular_tabela_csv(conn, 'clientes', 'clientes_academia.csv')
         popular_tabela_csv(conn, 'instrutores', 'instrutores.csv')
         popular_tabela_csv(conn, 'planos', 'planos.csv')
         popular_tabela_csv(conn, 'exercicios', 'exercicios.csv')
