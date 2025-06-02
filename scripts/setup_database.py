@@ -1,15 +1,25 @@
 import sqlite3
 import pandas as pd
 import os
+import traceback # Importar para o traceback detalhado
 
-# Define o nome do arquivo do banco de dados
-DB_NAME = 'academia.db'
-# Define o caminho para a pasta de dados CSV
-DATA_FOLDER = 'data'
+# --- DEFINIÇÃO ROBUSTA DE CAMINHOS ---
+# Diretório onde este script (setup_database.py) está localizado
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Diretório raiz do projeto (um nível acima da pasta 'scripts')
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+
+# Caminho para o arquivo do banco de dados na raiz do projeto
+DB_NAME = os.path.join(PROJECT_ROOT, 'academia.db') # Nome do BD com caminho completo
+
+# Caminho para a pasta 'data' na raiz do projeto
+DATA_FOLDER = os.path.join(PROJECT_ROOT, 'data')
+# --- FIM DA DEFINIÇÃO ROBUSTA DE CAMINHOS ---
 
 def conectar_bd():
     """Conecta ao banco de dados SQLite."""
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME) # Usa o DB_NAME com caminho completo
     return conn
 
 def criar_tabelas(conn):
@@ -109,76 +119,101 @@ def criar_tabelas(conn):
 def popular_tabela_csv(conn, nome_tabela, nome_arquivo_csv):
     """Popula uma tabela com dados de um arquivo CSV."""
     caminho_csv = os.path.join(DATA_FOLDER, nome_arquivo_csv)
-    if not os.path.exists(caminho_csv):
-        print(f"AVISO: Arquivo CSV '{caminho_csv}' não encontrado. Tabela '{nome_tabela}' não populada.")
+
+    print(f"\n--- Processando Tabela: {nome_tabela}, Arquivo: {nome_arquivo_csv} ---")
+    print(f"Caminho absoluto do CSV sendo verificado: {os.path.abspath(caminho_csv)}")
+
+    if not os.path.exists(caminho_csv): # Verificação inicial da existência do arquivo
+        print(f"AVISO: Arquivo CSV '{os.path.abspath(caminho_csv)}' NÃO ENCONTRADO. Tabela '{nome_tabela}' não populada.")
         return
+    else:
+        print(f"INFO: Arquivo CSV '{os.path.abspath(caminho_csv)}' encontrado.")
 
     try:
-        # Define colunas que devem ser tratadas como data
         date_columns = []
         if nome_tabela == 'clientes':
             date_columns = ['data_nascimento']
         elif nome_tabela == 'pagamentos':
             date_columns = ['data_pagamento']
         
-        # Lê o CSV para um DataFrame do pandas
-        # parse_dates tentará converter as colunas especificadas para datetime objects
+        print(f"1. Tentando ler o CSV '{caminho_csv}'...")
         df = pd.read_csv(caminho_csv, parse_dates=date_columns)
 
-        # Tratamento especial para colunas booleanas
+        # ---- INÍCIO DOS PRINTS DE DEPURAÇÃO ADICIONAIS (LOCAL CORRETO) ----
+        print(f"DEBUG: Para o arquivo '{nome_arquivo_csv}':")
+        if df.empty:
+            print("DEBUG: O DataFrame (df) está VAZIO após a leitura do CSV.")
+            print(f"AVISO: DataFrame vazio após ler '{caminho_csv}'. Tabela '{nome_tabela}' não será populada com dados deste arquivo.")
+            return # Sair se o df estiver vazio
+        else:
+            print(f"DEBUG: O DataFrame (df) tem {len(df)} linhas e {len(df.columns)} colunas.")
+            print("DEBUG: Primeiras 3 linhas do DataFrame (df.head(3)):")
+            print(df.head(3))
+            # Para uma depuração ainda mais profunda dos tipos de dados lidos pelo Pandas:
+            # print("DEBUG: Informações do DataFrame (df.info()):")
+            # df.info()
+        # ---- FIM DOS PRINTS DE DEPURAÇÃO ADICIONAIS ----
+
         if nome_tabela == 'pagamentos' and 'pago' in df.columns:
-            # Mapeia diversos formatos de booleano para 0 ou 1
+            print("DEBUG: Processando coluna 'pago' para a tabela de pagamentos...")
             map_bool = {'True': 1, 'False': 0, 'sim': 1, 'nao': 0, '1': 1, '0': 0, 1: 1, 0: 0,
                         'TRUE': 1, 'FALSE': 0, 'Sim': 1, 'Nao': 0, 'SIM': 1, 'NAO': 0}
-            # Converte para string primeiro para garantir que o map funcione com '1'/'0' do CSV
             df['pago'] = df['pago'].astype(str).map(map_bool).fillna(0).astype(int)
+            print("DEBUG: Coluna 'pago' processada. df.head(3) após 'pago':")
+            print(df.head(3))
 
-
-        # Remove a coluna 'id' do DataFrame se ela existir no CSV,
-        # pois o 'id' da tabela é AUTOINCREMENT.
-        # Se o seu CSV já tem IDs que você quer manter E eles são únicos E a tabela está vazia,
-        # você pode precisar de uma lógica diferente ou remover o AUTOINCREMENT da PK.
-        # Para este exemplo, vamos assumir que os IDs serão gerados pelo banco.
         if 'id' in df.columns:
+            print("DEBUG: Removendo coluna 'id' do DataFrame...")
             df = df.drop(columns=['id'])
-            print(f"Coluna 'id' removida do CSV para a tabela '{nome_tabela}' (será autoincrementada).")
+            print(f"DEBUG: Coluna 'id' removida. df.head(3) após remover 'id':")
+            print(df.head(3))
 
-        # Insere os dados do DataFrame na tabela SQL
-        # if_exists='append': adiciona os dados. Se a tabela já tiver dados, eles serão mantidos.
-        #                    Se houver conflitos de chave única (ex: email duplicado em clientes),
-        #                    a inserção da linha conflitante falhará.
-        # index=False: não escreve o índice do DataFrame como uma coluna na tabela SQL.
+        print(f"DEBUG: Tentando inserir {len(df)} linhas na tabela SQL '{nome_tabela}'...")
         df.to_sql(nome_tabela, conn, if_exists='append', index=False)
         
-        print(f"Dados do arquivo '{nome_arquivo_csv}' inseridos na tabela '{nome_tabela}' com sucesso.")
+        print(f"SUCESSO: Dados do arquivo '{nome_arquivo_csv}' inseridos na tabela '{nome_tabela}' com sucesso.")
 
     except pd.errors.EmptyDataError:
-        print(f"AVISO: O arquivo CSV '{caminho_csv}' está vazio. Tabela '{nome_tabela}' não populada.")
+        print(f"AVISO PANDAS: O arquivo CSV '{caminho_csv}' parece estar completamente vazio (EmptyDataError). Tabela '{nome_tabela}' não populada.")
     except FileNotFoundError:
-        print(f"ERRO: Arquivo CSV '{caminho_csv}' não encontrado!")
+        print(f"ERRO SISTEMA: Arquivo CSV '{caminho_csv}' não encontrado (FileNotFoundError) - Isso não deveria acontecer se o check inicial os.path.exists funcionou.")
     except Exception as e:
-        print(f"Ocorreu um erro ao popular a tabela '{nome_tabela}' com o arquivo '{nome_arquivo_csv}': {e}")
+        print(f"!!!!!!!!!! OCORREU UM ERRO DETALHADO AO PROCESSAR TABELA '{nome_tabela}' com arquivo '{nome_arquivo_csv}' !!!!!!!!!!")
+        print(f"Tipo de Erro: {type(e).__name__}")
+        print(f"Mensagem de Erro: {e}")
+        print("Traceback completo:")
+        traceback.print_exc()
+        if 'df' in locals() and isinstance(df, pd.DataFrame): # Verifica se df é um DataFrame
+             print("DEBUG: DataFrame no momento do erro (df.head(3)):")
+             print(df.head(3))
+        else:
+             print("DEBUG: DataFrame (df) não foi criado ou não é um DataFrame devido a um erro anterior.")
 
 
 if __name__ == '__main__':
+    print(f"--- Iniciando script setup_database.py ---")
+    print(f"Localização deste script (setup_database.py): {os.path.abspath(__file__)}")
+    print(f"Diretório Raiz do Projeto (PROJECT_ROOT) calculado: {PROJECT_ROOT}")
+    print(f"Pasta de Dados (DATA_FOLDER) calculada: {DATA_FOLDER}")
+    print(f"Caminho do Banco de Dados (DB_NAME) calculado: {DB_NAME}")
+    print(f"--------------------------------------------")
+
     conn = None
     try:
         conn = conectar_bd()
         print(f"Conectado ao banco de dados '{DB_NAME}' com sucesso.")
 
-        # 1. Criar as tabelas
         criar_tabelas(conn)
 
-        # 2. Popular as tabelas a partir dos CSVs
         print("\nIniciando povoamento das tabelas a partir de arquivos CSV...")
-        # (Você especificou CSVs para estas tabelas)
+        # Certifique-se de que os nomes dos arquivos CSV aqui correspondem EXATAMENTE
+        # aos nomes dos arquivos na sua pasta 'data/'
         popular_tabela_csv(conn, 'clientes', 'clientes_academia.csv')
         popular_tabela_csv(conn, 'instrutores', 'instrutores.csv')
         popular_tabela_csv(conn, 'planos', 'planos.csv')
         popular_tabela_csv(conn, 'exercicios', 'exercicios.csv')
         popular_tabela_csv(conn, 'pagamentos', 'pagamentos.csv')
-        # Adicione chamadas para outras tabelas se tiver CSVs para elas
-
+        
         print("\nPovoamento de tabelas concluído.")
 
     except sqlite3.Error as e:

@@ -9,50 +9,45 @@ def conectar_bd():
 
 def _fetch_all(query, params=None):
     """Executa uma query e retorna todos os resultados."""
-    conn = None # Garante que conn está definida no bloco finally
-    try:
-        conn = conectar_bd()
-        cursor = conn.cursor()
-        if params:
-            cursor.execute(query, params)
-        else:
-            cursor.execute(query)
-        results = [dict(row) for row in cursor.fetchall()]
-        return results
-    except sqlite3.Error as e:
-        print(f"!!!!!!!! ERRO DE BANCO DE DADOS (_fetch_all) !!!!!!!!")
-        print(f"Query: {query}")
-        print(f"Params: {params}")
-        print(f"Erro SQLite específico: {type(e).__name__} - {e}") # Mostrar tipo e mensagem do erro
-        # Você pode optar por relançar o erro para parar a execução ou retornar uma lista vazia/None
-        # raise 
-        return [] # Exemplo: retornar lista vazia em caso de erro
-    finally:
-        if conn:
-            conn.close()
+    conn = conectar_bd()
+    cursor = conn.cursor()
+    if params:
+        cursor.execute(query, params)
+    else:
+        cursor.execute(query)
+    results = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return results
 
 def _fetch_one(query, params=None):
     """Executa uma query e retorna um único resultado."""
-    conn = None # Garante que conn está definida no bloco finally
+    conn = conectar_bd()
+    cursor = conn.cursor()
+    if params:
+        cursor.execute(query, params)
+    else:
+        cursor.execute(query)
+    result = cursor.fetchone()
+    conn.close()
+    return dict(result) if result else None
+
+def _execute_query(query, params=None):
+    """Executa uma query de modificação (INSERT, UPDATE, DELETE)."""
+    conn = conectar_bd()
+    cursor = conn.cursor()
     try:
-        conn = conectar_bd()
-        cursor = conn.cursor()
         if params:
             cursor.execute(query, params)
         else:
             cursor.execute(query)
-        result = cursor.fetchone()
-        return dict(result) if result else None
+        conn.commit()
+        return cursor.lastrowid # Útil para INSERTs com autoincrement
     except sqlite3.Error as e:
-        print(f"!!!!!!!! ERRO DE BANCO DE DADOS (_fetch_one) !!!!!!!!")
-        print(f"Query: {query}")
-        print(f"Params: {params}")
-        print(f"Erro SQLite específico: {type(e).__name__} - {e}") # Mostrar tipo e mensagem do erro
-        # raise
-        return None # Exemplo: retornar None em caso de erro
+        print(f"Erro ao executar query: {e}")
+        conn.rollback() # Desfaz alterações em caso de erro
+        return None
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 def get_all_clients():
     """Retorna todos os clientes."""
@@ -230,14 +225,15 @@ if __name__ == '__main__':
     # Testes rápidos (descomente para testar individualmente após popular o banco)
     print("Executando testes do database.py...")
 
-    #print("\nTodos os Clientes:")
-    #print(get_all_clients())
-
-    # print("\nCliente com ID 1:")
-    # print(get_client_by_id(1))
+    print("\n--- Testando get_all_clients() ---")
+    todos_os_clientes = get_all_clients()
+    for cliente in todos_os_clientes:
+        print(cliente)
+    else:
+        print("Nenhum cliente encontrado ou a tabela está vazia.")
     
-    # print("\nTodos os Planos:")
-    # print(get_all_plans())
+   # print("\nTodos os Planos:")
+    #print(get_all_plans())
 
     # print("\nTodos os Instrutores:")
     # print(get_all_instructors())
@@ -245,13 +241,13 @@ if __name__ == '__main__':
     # print("\nTodos os Exercícios:")
     # print(get_all_exercises())
 
-    print("\nPagamentos do cliente 1:")
-    print(get_pagamentos_by_client_id(1))
+   #print("\nPagamentos do cliente 1:")
+    #print(get_pagamentos_by_client_id(1))
 
-    print("\nClientes com info de plano atual:")
-    print(get_clients_with_current_plan_info())
+    #print("\nClientes com info de plano atual:")
+    #print(get_clients_with_current_plan_info())
     
-    print("\nTreinos e exercícios (todos):")
+    #rint("\nTreinos e exercícios (todos):")
     # treinos_todos = get_workouts_with_exercises()
     # for treino in treinos_todos:
     #     print(f"Treino ID: {treino['treino_id']}, Cliente: {treino['cliente_nome']}")
