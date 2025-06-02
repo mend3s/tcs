@@ -1,41 +1,70 @@
 import sqlite3
+import os
 
-DB_NAME = 'academia.db'
+# --- DEFINIÇÃO ROBUSTA DE CAMINHOS ---
+# Diretório onde este script (database.py) está localizado
+# Se database.py estiver em uma pasta 'src', SCRIPT_DIR será '.../seu_projeto/src'
+SCRIPT_DIR_DB = os.path.dirname(os.path.abspath(__file__))
+
+# Diretório raiz do projeto (um nível acima se database.py estiver em 'src', ou o mesmo se estiver na raiz)
+# Ajuste conforme a estrutura do seu projeto. Se database.py está na raiz, PROJECT_ROOT_DB = SCRIPT_DIR_DB
+PROJECT_ROOT_DB = os.path.dirname(SCRIPT_DIR_DB) # Assume que database.py está em 'src'
+# Se database.py estiver na raiz do projeto, use:
+# PROJECT_ROOT_DB = SCRIPT_DIR_DB
+
+DB_NAME = os.path.join(PROJECT_ROOT_DB, 'academia.db')
 
 def conectar_bd():
-    conn = sqlite3.connect(DB_NAME)
-    conn.row_factory = sqlite3.Row # Para acessar colunas pelo nome
-    return conn
-
-def _fetch_all(query, params=None):
-    """Executa uma query e retorna todos os resultados."""
-    conn = conectar_bd()
-    cursor = conn.cursor()
-    if params:
-        cursor.execute(query, params)
-    else:
-        cursor.execute(query)
-    results = [dict(row) for row in cursor.fetchall()]
-    conn.close()
-    return results
-
-def _fetch_one(query, params=None):
-    """Executa uma query e retorna um único resultado."""
-    conn = conectar_bd()
-    cursor = conn.cursor()
-    if params:
-        cursor.execute(query, params)
-    else:
-        cursor.execute(query)
-    result = cursor.fetchone()
-    conn.close()
-    return dict(result) if result else None
-
-def _execute_query(query, params=None):
-    """Executa uma query de modificação (INSERT, UPDATE, DELETE)."""
-    conn = conectar_bd()
-    cursor = conn.cursor()
+    """Conecta ao banco de dados SQLite e configura row_factory."""
     try:
+        conn = sqlite3.connect(DB_NAME)
+        conn.row_factory = sqlite3.Row # Para acessar colunas pelo nome
+        return conn
+    except sqlite3.Error as e:
+        print(f"Erro ao conectar ao banco de dados '{DB_NAME}': {e}")
+        raise # Re-levanta a exceção para que o chamador saiba que falhou
+
+def _fetch_all(query, params=None, conn_externa=None):
+    """Executa uma query e retorna todos os resultados como lista de dicionários."""
+    conn = conn_externa if conn_externa else conectar_bd()
+    try:
+        cursor = conn.cursor()
+        if params:
+            cursor.execute(query, params)
+        else:
+            cursor.execute(query)
+        results = [dict(row) for row in cursor.fetchall()]
+        return results
+    except sqlite3.Error as e:
+        print(f"Erro em _fetch_all com query '{query[:50]}...': {e}")
+        return [] # Retorna lista vazia em caso de erro
+    finally:
+        if not conn_externa and conn: # Só fecha se a conexão foi aberta nesta função
+            conn.close()
+
+def _fetch_one(query, params=None, conn_externa=None):
+    """Executa uma query e retorna um único resultado como dicionário."""
+    conn = conn_externa if conn_externa else conectar_bd()
+    try:
+        cursor = conn.cursor()
+        if params:
+            cursor.execute(query, params)
+        else:
+            cursor.execute(query)
+        result = cursor.fetchone()
+        return dict(result) if result else None
+    except sqlite3.Error as e:
+        print(f"Erro em _fetch_one com query '{query[:50]}...': {e}")
+        return None # Retorna None em caso de erro
+    finally:
+        if not conn_externa and conn:
+            conn.close()
+
+def _execute_query(query, params=None, conn_externa=None):
+    """Executa uma query de modificação (INSERT, UPDATE, DELETE)."""
+    conn = conn_externa if conn_externa else conectar_bd()
+    try:
+        cursor = conn.cursor()
         if params:
             cursor.execute(query, params)
         else:
@@ -43,29 +72,163 @@ def _execute_query(query, params=None):
         conn.commit()
         return cursor.lastrowid # Útil para INSERTs com autoincrement
     except sqlite3.Error as e:
-        print(f"Erro ao executar query: {e}")
-        conn.rollback() # Desfaz alterações em caso de erro
+        print(f"Erro em _execute_query com query '{query[:50]}...': {e}")
+        if conn and not conn_externa: # Só faz rollback se a conexão foi aberta aqui e ainda existe
+             conn.rollback()
         return None
     finally:
-        conn.close()
+        if not conn_externa and conn:
+            conn.close()
 
+# --- Funções para Clientes ---
 def get_all_clients():
-    """Retorna todos os clientes."""
-    query = "SELECT id, nome, email, telefone, data_nascimento FROM clientes ORDER BY nome;"
+    """Retorna todos os clientes com as novas colunas."""
+    query = """
+        SELECT id, nome, idade, sexo, email, telefone, plano_id, instrutor_id, treino_id
+        FROM clientes ORDER BY nome;
+    """
     return _fetch_all(query)
 
+def add_client(nome, email, idade=None, sexo=None, telefone=None, plano_id=None, instrutor_id=None, treino_id=None):
+    """Adiciona um novo cliente."""
+    query = """
+        INSERT INTO clientes (nome, idade, sexo, email, telefone, plano_id, instrutor_id, treino_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """
+    params = (nome, idade, sexo, email, telefone, plano_id, instrutor_id, treino_id)
+    return _execute_query(query, params)
+
+# --- Funções para Instrutores ---
+def get_all_instructors():
+    """Retorna todos os instrutores."""
+    query = "SELECT id, nome, especialidade FROM instrutores ORDER BY nome;"
+    return _fetch_all(query)
+
+def add_instructor(nome, especialidade=None):
+    """Adiciona um novo instrutor."""
+    query = "INSERT INTO instrutores (nome, especialidade) VALUES (?, ?)"
+    return _execute_query(query, (nome, especialidade))
+
+# --- Funções para Planos ---
 def get_all_plans():
     """Retorna todos os planos."""
     query = "SELECT id, nome, preco_mensal, duracao_meses FROM planos ORDER BY nome;"
     return _fetch_all(query)
 
+def add_plan(nome, preco_mensal, duracao_meses):
+    """Adiciona um novo plano."""
+    query = "INSERT INTO planos (nome, preco_mensal, duracao_meses) VALUES (?, ?, ?)"
+    return _execute_query(query, (nome, preco_mensal, duracao_meses))
+
+# --- Funções para Exercícios ---
 def get_all_exercises():
     """Retorna todos os exercícios."""
     query = "SELECT id, nome, grupo_muscular FROM exercicios ORDER BY nome;"
     return _fetch_all(query)
 
+def add_exercise(nome, grupo_muscular=None):
+    """Adiciona um novo exercício."""
+    query = "INSERT INTO exercicios (nome, grupo_muscular) VALUES (?, ?)"
+    return _execute_query(query, (nome, grupo_muscular))
+
+# --- Funções para Treinos ---
+def add_treino(nome_treino, data_inicio, cliente_id=None, instrutor_id=None, plano_id=None,
+               data_fim=None, objetivo=None, tipo_treino=None, descricao_treino=None):
+    """Adiciona um novo treino principal."""
+    query = """
+        INSERT INTO treinos 
+            (nome_treino, cliente_id, instrutor_id, plano_id, data_inicio, data_fim, objetivo, tipo_treino, descricao_treino)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """
+    params = (nome_treino, cliente_id, instrutor_id, plano_id, data_inicio, data_fim, objetivo, tipo_treino, descricao_treino)
+    return _execute_query(query, params)
+
+def add_exercise_to_treino(treino_id, exercicio_id, series=None, repeticoes=None, carga=None,
+                           descanso_segundos=None, ordem=None, observacoes_exercicio=None):
+    """Adiciona um exercício a um treino específico na tabela treino_exercicio."""
+    query = """
+        INSERT INTO treino_exercicio
+            (treino_id, exercicio_id, series, repeticoes, carga, descanso_segundos, ordem, observacoes_exercicio)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """
+    params = (treino_id, exercicio_id, series, repeticoes, carga, descanso_segundos, ordem, observacoes_exercicio)
+    return _execute_query(query, params)
+
+def get_workouts_with_exercises(cliente_id=None, instrutor_id=None):
+    """
+    Filtra e mostra treinos e seus exercícios.
+    Retorna uma lista de treinos, onde cada treino contém uma lista de seus exercícios.
+    """
+    conn = conectar_bd() # Usar uma conexão para toda a operação
+    
+    base_query_treinos = """
+        SELECT
+            t.id AS treino_id,
+            t.nome_treino,
+            t.data_inicio,
+            t.data_fim,
+            t.objetivo,
+            t.tipo_treino,
+            t.descricao_treino,
+            c.id AS cliente_id,
+            c.nome AS cliente_nome,
+            i.id AS instrutor_id,
+            i.nome AS instrutor_nome,
+            pl.id AS plano_id,
+            pl.nome AS plano_nome
+        FROM treinos t
+        LEFT JOIN clientes c ON t.cliente_id = c.id
+        LEFT JOIN instrutores i ON t.instrutor_id = i.id
+        LEFT JOIN planos pl ON t.plano_id = pl.id
+    """
+    conditions = []
+    params_query_treinos = []
+
+    if cliente_id:
+        conditions.append("t.cliente_id = ?")
+        params_query_treinos.append(cliente_id)
+    if instrutor_id:
+        conditions.append("t.instrutor_id = ?")
+        params_query_treinos.append(instrutor_id)
+    
+    if conditions:
+        base_query_treinos += " WHERE " + " AND ".join(conditions)
+    
+    base_query_treinos += " ORDER BY t.data_inicio DESC, t.id DESC;"
+
+    treinos = _fetch_all(base_query_treinos, tuple(params_query_treinos), conn_externa=conn)
+
+    query_exercicios_treino = """
+        SELECT
+            te.id,
+            e.nome AS exercicio_nome,
+            e.grupo_muscular,
+            te.series,
+            te.repeticoes,
+            te.carga,
+            te.descanso_segundos,
+            te.ordem,
+            te.observacoes_exercicio
+        FROM treino_exercicio te
+        JOIN exercicios e ON te.exercicio_id = e.id
+        WHERE te.treino_id = ?
+        ORDER BY te.ordem ASC, te.id ASC;
+    """
+    
+    for treino in treinos:
+        # Usar a mesma conexão 'conn' para buscar os exercícios
+        exercicios_do_treino = _fetch_all(query_exercicios_treino, (treino['treino_id'],), conn_externa=conn)
+        treino['exercicios'] = exercicios_do_treino
+    
+    if conn:
+        conn.close() # Fechar a conexão principal no final
+
+    return treinos
+
+# --- Funções para Pagamentos ---
 def get_pagamentos_by_client_id(cliente_id):
     """Retorna todos os pagamentos de um cliente específico."""
+    # Assumindo que a FK para clientes existe na tabela pagamentos para integridade
     query = """
         SELECT p.id, p.cliente_id, c.nome as cliente_nome, p.data_pagamento, p.valor, p.pago
         FROM pagamentos p
@@ -75,92 +238,47 @@ def get_pagamentos_by_client_id(cliente_id):
     """
     return _fetch_all(query, (cliente_id,))
 
+def add_pagamento(cliente_id, data_pagamento, valor, pago=0):
+    """Adiciona um novo pagamento."""
+    query = "INSERT INTO pagamentos (cliente_id, data_pagamento, valor, pago) VALUES (?, ?, ?, ?)"
+    return _execute_query(query, (cliente_id, data_pagamento, valor, pago))
+
+# --- Funções de Relatório/Dashboard (Exemplos) ---
 def get_clients_with_current_plan_info():
-    #lista todos clientes e tenta encontrar seus planos
+    """
+    Lista todos os clientes e tenta encontrar informações do plano do seu treino mais recente.
+    Se o cliente tiver um plano_id direto, essa informação também pode ser usada.
+    Esta versão foca no plano do último treino.
+    """
     query = """
     SELECT
         c.id AS cliente_id,
         c.nome AS cliente_nome,
         c.email AS cliente_email,
-        p.nome AS plano_nome,
-        p.preco_mensal AS plano_preco,
-        t.data_inicio AS treino_data_inicio,
-        t.data_fim AS treino_data_fim
+        c.idade AS cliente_idade,
+        c.sexo AS cliente_sexo,
+        c.telefone AS cliente_telefone,
+        pl_cliente.nome AS plano_direto_cliente, -- Plano direto do cliente
+        p_treino.nome AS plano_ultimo_treino,
+        t.nome_treino AS ultimo_treino_nome,
+        t.data_inicio AS ultimo_treino_data_inicio,
+        t.data_fim AS ultimo_treino_data_fim
     FROM clientes c
+    LEFT JOIN planos pl_cliente ON c.plano_id = pl_cliente.id -- Join para o plano direto do cliente
     LEFT JOIN (
         SELECT 
             cliente_id, 
-            plano_id, 
+            plano_id,
+            nome_treino, 
             data_inicio, 
             data_fim,
-            ROW_NUMBER() OVER(PARTITION BY cliente_id ORDER BY data_inicio DESC) as rn
+            ROW_NUMBER() OVER(PARTITION BY cliente_id ORDER BY data_inicio DESC, id DESC) as rn
         FROM treinos
     ) t ON c.id = t.cliente_id AND t.rn = 1 -- Pega o treino mais recente por cliente
-    LEFT JOIN planos p ON t.plano_id = p.id
+    LEFT JOIN planos p_treino ON t.plano_id = p_treino.id -- Join para o plano do último treino
     ORDER BY c.nome;
     """
     return _fetch_all(query)
-
-def get_workouts_with_exercises(cliente_id=None, instrutor_id=None):
-    """
-    Filtra e mostra treinos e seus exercícios.
-    Retorna uma lista de treinos, onde cada treino contém uma lista de seus exercícios.
-    """
-    base_query_treinos = """
-        SELECT
-            t.id AS treino_id,
-            t.data_inicio,
-            t.data_fim,
-            c.id AS cliente_id,
-            c.nome AS cliente_nome,
-            i.id AS instrutor_id,
-            i.nome AS instrutor_nome,
-            p.id AS plano_id,
-            p.nome AS plano_nome
-        FROM treinos t
-        JOIN clientes c ON t.cliente_id = c.id
-        JOIN instrutores i ON t.instrutor_id = i.id
-        JOIN planos p ON t.plano_id = p.id
-    """
-    conditions = []
-    params = []
-
-    if cliente_id:
-        conditions.append("t.cliente_id = ?")
-        params.append(cliente_id)
-    if instrutor_id:
-        conditions.append("t.instrutor_id = ?")
-        params.append(instrutor_id)
-    
-    if conditions:
-        base_query_treinos += " WHERE " + " AND ".join(conditions)
-    
-    base_query_treinos += " ORDER BY t.data_inicio DESC, t.id DESC;"
-
-    treinos = _fetch_all(base_query_treinos, tuple(params))
-
-    query_exercicios_treino = """
-        SELECT
-            te.id,
-            e.nome AS exercicio_nome,
-            e.grupo_muscular,
-            te.series,
-            te.repeticoes
-        FROM treino_exercicio te
-        JOIN exercicios e ON te.exercicio_id = e.id
-        WHERE te.treino_id = ?;
-    """
-    
-    # Para cada treino, busca seus exercícios
-    conn_exercicios = conectar_bd() # Abrir uma conexão para buscar os exercícios
-    for treino in treinos:
-        cursor = conn_exercicios.cursor()
-        cursor.execute(query_exercicios_treino, (treino['treino_id'],))
-        exercicios_do_treino = [dict(row) for row in cursor.fetchall()]
-        treino['exercicios'] = exercicios_do_treino
-    conn_exercicios.close() # Fechar a conexão após buscar todos os exercícios
-
-    return treinos
 
 def get_payment_stats_for_client(cliente_id):
     """Retorna o total de pagamentos e o último pagamento de um cliente."""
@@ -190,82 +308,100 @@ def get_payment_stats_for_client(cliente_id):
 
 def get_active_client_count_per_instructor():
     """
-    Retorna quantos clientes distintos cada instrutor atende.
-    Considera "ativo" se o treino não tem data_fim ou data_fim é no futuro (ajustar lógica se necessário).
-    Alternativamente, pode-se contar todos os clientes que já tiveram treino com o instrutor.
+    Retorna quantos clientes distintos cada instrutor atende,
+    baseado em treinos que não têm data_fim ou cuja data_fim é no futuro.
     """
-    # Esta query conta clientes distintos por instrutor baseado em treinos que não tem data_fim
-    # ou cuja data_fim ainda não passou (considerando 'now' como data atual).
     query = """
     SELECT
         i.id AS instrutor_id,
         i.nome AS instrutor_nome,
+        i.especialidade AS instrutor_especialidade,
         COUNT(DISTINCT t.cliente_id) AS numero_clientes_ativos
     FROM instrutores i
     LEFT JOIN treinos t ON i.id = t.instrutor_id 
                        AND (t.data_fim IS NULL OR t.data_fim >= date('now'))
-    GROUP BY i.id, i.nome
+    GROUP BY i.id, i.nome, i.especialidade
     ORDER BY numero_clientes_ativos DESC, i.nome;
     """
-    # Se quiser contar todos os clientes, independentemente de o treino ser "ativo":
-    # query = """
-    # SELECT
-    #     i.id AS instrutor_id,
-    #     i.nome AS instrutor_nome,
-    #     COUNT(DISTINCT t.cliente_id) AS numero_clientes
-    # FROM instrutores i
-    # LEFT JOIN treinos t ON i.id = t.instrutor_id
-    # GROUP BY i.id, i.nome
-    # ORDER BY numero_clientes DESC, i.nome;
-    # """
+    return _fetch_all(query)
+
+# --- Funções para Selectboxes em formulários (exemplos) ---
+def get_all_clients_for_select():
+    """Retorna (id, nome) de todos os clientes para selectboxes."""
+    query = "SELECT id, nome FROM clientes ORDER BY nome ASC;"
+    return _fetch_all(query) # _fetch_all já retorna lista de dicts
+
+def get_all_instructors_for_select():
+    """Retorna (id, nome) de todos os instrutores para selectboxes."""
+    query = "SELECT id, nome FROM instrutores ORDER BY nome ASC;"
+    return _fetch_all(query)
+
+def get_all_plans_for_select():
+    """Retorna (id, nome) de todos os planos para selectboxes."""
+    query = "SELECT id, nome FROM planos ORDER BY nome ASC;"
+    return _fetch_all(query)
+
+def get_all_exercises_for_select():
+    """Retorna (id, nome) de todos os exercícios globais para selectboxes."""
+    query = "SELECT id, nome FROM exercicios ORDER BY nome ASC;"
+    return _fetch_all(query)
+
+def get_all_treinos_for_select():
+    """Retorna (id, nome_treino) de todos os treinos para selectboxes."""
+    query = "SELECT id, nome_treino FROM treinos WHERE nome_treino IS NOT NULL ORDER BY nome_treino ASC;"
     return _fetch_all(query)
 
 
 if __name__ == '__main__':
     # Testes rápidos (descomente para testar individualmente após popular o banco)
     print("Executando testes do database.py...")
+    
+    # É importante que o banco 'academia.db' exista e esteja populado para os testes.
+    # Você pode rodar o script setup_database_academia_v3_simples.py primeiro.
 
     print("\n--- Testando get_all_clients() ---")
     todos_os_clientes = get_all_clients()
-    for cliente in todos_os_clientes:
-        print(cliente)
+    if todos_os_clientes:
+        for cliente in todos_os_clientes[:3]: # Mostra os 3 primeiros
+            print(cliente)
     else:
         print("Nenhum cliente encontrado ou a tabela está vazia.")
     
-   # print("\nTodos os Planos:")
-    #print(get_all_plans())
+    print("\n--- Testando get_all_instructors() ---")
+    todos_os_instrutores = get_all_instructors()
+    if todos_os_instrutores:
+        for instrutor in todos_os_instrutores[:3]:
+            print(instrutor)
+    else:
+        print("Nenhum instrutor encontrado.")
 
-    # print("\nTodos os Instrutores:")
-    # print(get_all_instructors())
+    print("\n--- Testando get_all_exercises() ---")
+    todos_os_exercicios = get_all_exercises()
+    if todos_os_exercicios:
+        for exercicio in todos_os_exercicios[:3]:
+            print(exercicio)
+    else:
+        print("Nenhum exercício encontrado.")
 
-    # print("\nTodos os Exercícios:")
-    # print(get_all_exercises())
+    print("\n--- Testando get_workouts_with_exercises (sem filtro) ---")
+    treinos_todos = get_workouts_with_exercises()
+    if treinos_todos:
+        for treino in treinos_todos[:2]: # Mostra os 2 primeiros treinos com seus exercícios
+            print(f"Treino ID: {treino.get('treino_id')}, Nome: {treino.get('nome_treino')}, Cliente: {treino.get('cliente_nome')}")
+            if treino.get('exercicios'):
+                for ex in treino['exercicios'][:2]: # Mostra os 2 primeiros exercícios do treino
+                    print(f"  - Ex ID: {ex.get('id')}, Nome: {ex.get('exercicio_nome')}, Series: {ex.get('series')}, Reps: {ex.get('repeticoes')}")
+            else:
+                print("  - Sem exercícios associados.")
+    else:
+        print("Nenhum treino encontrado.")
 
-   #print("\nPagamentos do cliente 1:")
-    #print(get_pagamentos_by_client_id(1))
+    print("\n--- Testando get_clients_with_current_plan_info() ---")
+    clientes_planos = get_clients_with_current_plan_info()
+    if clientes_planos:
+        for cp_info in clientes_planos[:3]:
+            print(cp_info)
+    else:
+        print("Nenhuma informação de cliente com plano encontrada.")
 
-    #print("\nClientes com info de plano atual:")
-    #print(get_clients_with_current_plan_info())
-    
-    #rint("\nTreinos e exercícios (todos):")
-    # treinos_todos = get_workouts_with_exercises()
-    # for treino in treinos_todos:
-    #     print(f"Treino ID: {treino['treino_id']}, Cliente: {treino['cliente_nome']}")
-    #     for ex in treino['exercicios']:
-    #         print(f"  - {ex['exercicio_nome']} ({ex['series']}x{ex['repeticoes']})")
-
-    # print("\nTreinos e exercícios (cliente ID 1):")
-    # treinos_cliente1 = get_workouts_with_exercises(cliente_id=1)
-    # for treino in treinos_cliente1:
-    #     print(f"Treino ID: {treino['treino_id']}, Cliente: {treino['cliente_nome']}")
-    #     for ex in treino['exercicios']:
-    #         print(f"  - {ex['exercicio_nome']} ({ex['series']}x{ex['repeticoes']})")
-
-
-    # print("\nEstatísticas de pagamento para cliente 1:")
-    # print(get_payment_stats_for_client(1))
-
-    # print("\nContagem de clientes ativos por instrutor:")
-    # print(get_active_client_count_per_instructor())
-    
     print("\nTestes concluídos.")
