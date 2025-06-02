@@ -220,6 +220,14 @@ def get_active_client_count_per_instructor():
     # """
     return _fetch_all(query)
 
+def inserir_cliente(nome, email, telefone, data_nascimento):
+    """Insere um novo cliente no banco de dados."""
+    query = """
+    INSERT INTO clientes (nome, email, telefone, data_nascimento)
+    VALUES (?, ?, ?, ?)
+    """
+    params = (nome, email, telefone, data_nascimento)
+    return _execute_query(query, params)
 
 if __name__ == '__main__':
     # Testes rápidos (descomente para testar individualmente após popular o banco)
@@ -238,8 +246,8 @@ if __name__ == '__main__':
     # print("\nTodos os Instrutores:")
     # print(get_all_instructors())
 
-    # print("\nTodos os Exercícios:")
-    # print(get_all_exercises())
+    print("\nTodos os Exercícios:")
+    print(get_all_exercises())
 
    #print("\nPagamentos do cliente 1:")
     #print(get_pagamentos_by_client_id(1))

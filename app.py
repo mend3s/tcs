@@ -2,6 +2,7 @@
 import streamlit as st
 import streamlit_pills as stp
 import pandas as pd
+from src import database
 # from src import database # Mantenha para suas funções de BD
 
 import streamlit_authenticator as stauth # Biblioteca de autenticação
@@ -102,11 +103,7 @@ if st.session_state["authentication_status"]:
     # --- Conteúdo da Página Selecionada ---
     if pagina_atual == "Dashboard":
         st.title("🏠 Dashboard")
-        st.header(f"Olá, {st.session_state['name']}!") # Usa o nome completo do config.yaml
-        # ... (seu conteúdo do Dashboard, pode usar st.session_state.role_usuario para diferenciar) ...
-        # Exemplo de como usar o database.py para carregar dados na dashboard
-        # try:
-        #     from src import database # Mova o import para o topo do arquivo se usar em vários lugares
+        st.header(f"Olá, {st.session_state['name']}!") 
         #     clientes_data = database.get_all_clients()
         #     if clientes_data:
         #         df = pd.DataFrame(clientes_data)
@@ -116,12 +113,25 @@ if st.session_state["authentication_status"]:
         #     st.warning("Módulo 'database' não encontrado para carregar dados no dashboard.")
         # except Exception as e:
         #     st.error(f"Erro ao carregar dados para o dashboard: {e}")
-
-
     elif pagina_atual == "Clientes":
         st.title("👥 Clientes")
-        st.header("Gerenciamento de Clientes")
-        # ... (seu código para a página de Clientes) ...
+        if st.session_state.get("role_usuario") == "admin":
+            st.write("Bem-vindo à área de gerenciamento de clientes.")
+
+            clientes_data = database.get_clients_with_current_plan_info()
+
+            if clientes_data:
+                df = pd.DataFrame(clientes_data)
+
+                st.subheader("Tabela de clientes com treino atual")
+
+                st.dataframe(df[['cliente_id', 'cliente_nome', 'cliente_email', 'plano_nome', 'plano_preco', 'treino_data_inicio', 'treino_data_fim']])
+            else:
+                st.warning("Nenhum cliente encontrado.")
+        else:
+            st.error("Acesso Negado. Esta área é restrita a administradores.")
+            st.header("Gerenciamento de Clientes")
+
 
     elif pagina_atual == "Treinos":
         st.title("🏋️ Treinos")
@@ -141,9 +151,6 @@ if st.session_state["authentication_status"]:
             # ... (seu código para a página de Admin) ...
         else:
             st.error("Acesso Negado. Esta área é restrita a administradores.")
-            # Opcionalmente, redirecione ou mostre o Dashboard
-            # st.session_state.pagina_selecionada = "Dashboard" 
-            # st.rerun()
 
 elif st.session_state["authentication_status"] is False:
     st.error('Nome de usuário/senha incorretos.')
