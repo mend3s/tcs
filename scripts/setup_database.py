@@ -178,7 +178,7 @@ if __name__ == '__main__':
         print("\nAVISO IMPORTANTE: A tabela 'treinos' não está sendo populada por CSV neste script.")
         print("Para que 'treino_exercicio' seja populada corretamente, a tabela 'treinos' deve")
         print("conter os 'treino_id's referenciados no arquivo 'treino_exercicios.csv'.")
-
+        popular_tabela_csv_simples(conn, 'treinos', 'treinos.csv')
         popular_tabela_csv_simples(conn, 'treino_exercicio', 'treino_exercicios.csv')
         
         popular_tabela_csv_simples(conn, 'pagamentos', 'pagamentos.csv')

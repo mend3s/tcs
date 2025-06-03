@@ -114,24 +114,49 @@ if st.session_state["authentication_status"]:
         # except Exception as e:
         #     st.error(f"Erro ao carregar dados para o dashboard: {e}")
     elif pagina_atual == "Clientes":
-        st.title("👥 Clientes")
-        if st.session_state.get("role_usuario") == "admin":
-            st.write("Bem-vindo à área de gerenciamento de clientes.")
+        st.title("👨‍💻 Gestão de Clientes")
+        st.markdown("Gerencie os clientes da sua academia: visualize, adicione e veja seus planos.")
 
-            clientes_data = database.get_clients_with_current_plan_info()
+        # --- Seção de Listagem de Clientes ---
+        st.header("Lista de Clientes e Seus Planos")
 
-            if clientes_data:
-                df = pd.DataFrame(clientes_data)
+        # Carregar dados dos clientes com informações de plano
+        # Certifique-se que get_clients_with_current_plan_info está no seu database.py
+        clientes_info = database.get_clients_with_current_plan_info()
 
-                st.subheader("Tabela de clientes com treino atual")
+        if clientes_info:
+            # Convertendo para DataFrame para melhor visualização e manipulação (opcional, mas recomendado)
+            df_clientes = pd.DataFrame(clientes_info)
+            
+            # Renomear colunas para exibição amigável
+            df_clientes_display = df_clientes[[
+                'cliente_nome', 
+                'cliente_email', 
+                'cliente_telefone', 
+                'plano_direto_cliente', 
+                'plano_ultimo_treino', 
+                'ultimo_treino_nome',
+                'ultimo_treino_data_inicio'
+            ]].copy()
+            
+            df_clientes_display.columns = [
+                'Nome do Cliente', 
+                'Email', 
+                'Telefone', 
+                'Plano Direto', 
+                'Plano Último Treino', 
+                'Último Treino', 
+                'Início Último Treino'
+            ]
 
-                st.dataframe(df[['cliente_id', 'cliente_nome', 'cliente_email', 'plano_nome', 'plano_preco', 'treino_data_inicio', 'treino_data_fim']])
-            else:
-                st.warning("Nenhum cliente encontrado.")
+            # Campo de filtro de clientes (nome)
+            filtro_cliente_nome = st.text_input("Filtrar clientes por nome:", "")
+            if filtro_cliente_nome:
+                df_clientes_display = df_clientes_display[df_clientes_display['Nome do Cliente'].str.contains(filtro_cliente_nome, case=False, na=False)]
+
+            st.dataframe(df_clientes_display, use_container_width=True)
         else:
-            st.error("Acesso Negado. Esta área é restrita a administradores.")
-            st.header("Gerenciamento de Clientes")
-
+            st.info("Nenhum cliente cadastrado ainda.")
 
     elif pagina_atual == "Treinos":
         st.title("🏋️ Treinos")

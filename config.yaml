@@ -1,36 +1,29 @@
-
-
 credentials:
   usernames:
-    # Usuário Admin
-    admin: # Este é o 'username'
+    admin:
       email: mend3s.c@outlook.com
-      name: Administrador do Sistema # Nome completo para exibição
-      password: 'hashed_password_for_admin' # SUBSTITUA PELA SENHA HASHED
-      role: 'admin' # Campo personalizado para o papel
+      name: Administrador do Sistema 
+      password: 'admin'
+      role: 'admin' 
     
     # Usuário Comum 1
     joao:
       email: joaooguilherme.dev@gmail.com
       name: João Silva
-      password: 'hashed_password_for_joao' # SUBSTITUA PELA SENHA HASHED
+      password: 'hashed_password_for_joao'
       role: 'user'
 
-    # Usuário Comum 2
     Edu:
       email: edu@example.com
       name: Eduardo Carlos
-      password: 'hashed_password_for_edu' # SUBSTITUA PELA SENHA HASHED
+      password: 'hashed_password_for_edu'
       role: 'admin'
-      
-    # Adicione mais usuários conforme necessário
 
 cookie:
-  expiry_days: 30 # Por quantos dias o cookie de login será válido
-  key: 'strong_key' # Chave secreta para assinar o cookie. MUDE ISSO!
-  name: 'cookie_da_academia_app' # Nome do cookie
+  expiry_days: 30
+  key: 'strong_key'
+  name: 'cookie_da_academia_app'
 
-# Opcional: Para emails pré-autorizados (se você usar funcionalidades de registro)
 preauthorized:
    emails:
      - mend3s.c@gmail.com
