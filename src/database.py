@@ -412,3 +412,61 @@ if __name__ == '__main__':
         print("Nenhuma informação de cliente com plano encontrada.")
 
     print("\nTestes concluídos.")
+
+
+#configurações de cards 
+
+def count_total_clients():
+    """Retorna o número total de clientes cadastrados."""
+    query = "SELECT COUNT(*) AS total_clientes FROM clientes;"
+    result = _fetch_one(query)
+    return result['total_clientes'] if result and 'total_clientes' in result else 0
+
+def count_total_intrutores():
+    """Retorna o número total de clientes cadastrados."""
+    query = "SELECT COUNT(*) AS total_instrutores FROM instrutores;"
+    result = _fetch_one(query)
+    return result['total_instrutores'] if result and 'total_instrutores' in result else 0
+
+def count_clientes_por_plano():
+    """
+    Retorna a contagem de clientes para cada plano.
+    Espera-se que a tabela 'clientes' tenha 'plano_id' e
+    a tabela 'planos' tenha 'id' e 'nome'.
+    """
+    query = """
+        SELECT
+            p.nome AS nome_plano,
+            COUNT(c.id) AS total_clientes
+        FROM clientes c
+        JOIN planos p ON c.plano_id = p.id
+        GROUP BY p.nome
+        ORDER BY p.nome;
+    """
+    return _fetch_all(query)
+
+def count_clientes_por_plano():
+    """
+    Retorna a contagem de clientes para cada plano.
+    Espera-se que a tabela 'clientes' tenha 'plano_id' e
+    a tabela 'planos' tenha 'id' e 'nome'.
+    """
+    query = """
+        SELECT
+            p.nome AS nome_plano,
+            COUNT(c.id) AS total_clientes
+        FROM clientes c
+        JOIN planos p ON c.plano_id = p.id
+        GROUP BY p.nome
+        ORDER BY p.nome;
+    """
+    return _fetch_all(query)
+
+def count_pagamentosn():
+    
+    query ="""
+        SELECT COUNT(*) AS total_pago 
+        FROM pagamentos 
+        WHERE pago = 0; 
+        """
+    result = _fetch_one(query)
