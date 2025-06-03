@@ -1,22 +1,31 @@
 import sqlite3
 import os
 
+# --- DEFINIÇÃO ROBUSTA DE CAMINHOS ---
+# Diretório onde este script (database.py) está localizado
+# Se database.py estiver em uma pasta 'src', SCRIPT_DIR será '.../seu_projeto/src'
 SCRIPT_DIR_DB = os.path.dirname(os.path.abspath(__file__))
 
+# Diretório raiz do projeto (um nível acima se database.py estiver em 'src', ou o mesmo se estiver na raiz)
+# Ajuste conforme a estrutura do seu projeto. Se database.py está na raiz, PROJECT_ROOT_DB = SCRIPT_DIR_DB
 PROJECT_ROOT_DB = os.path.dirname(SCRIPT_DIR_DB) # Assume que database.py está em 'src'
+# Se database.py estiver na raiz do projeto, use:
+# PROJECT_ROOT_DB = SCRIPT_DIR_DB
 
 DB_NAME = os.path.join(PROJECT_ROOT_DB, 'academia.db')
 
 def conectar_bd():
+    """Conecta ao banco de dados SQLite e configura row_factory."""
     try:
         conn = sqlite3.connect(DB_NAME)
         conn.row_factory = sqlite3.Row # Para acessar colunas pelo nome
         return conn
     except sqlite3.Error as e:
         print(f"Erro ao conectar ao banco de dados '{DB_NAME}': {e}")
-        raise
+        raise # Re-levanta a exceção para que o chamador saiba que falhou
 
 def _fetch_all(query, params=None, conn_externa=None):
+    """Executa uma query e retorna todos os resultados como lista de dicionários."""
     conn = conn_externa if conn_externa else conectar_bd()
     try:
         cursor = conn.cursor()
@@ -28,12 +37,13 @@ def _fetch_all(query, params=None, conn_externa=None):
         return results
     except sqlite3.Error as e:
         print(f"Erro em _fetch_all com query '{query[:50]}...': {e}")
-        return []
+        return [] # Retorna lista vazia em caso de erro
     finally:
-        if not conn_externa and conn:
+        if not conn_externa and conn: # Só fecha se a conexão foi aberta nesta função
             conn.close()
 
 def _fetch_one(query, params=None, conn_externa=None):
+    """Executa uma query e retorna um único resultado como dicionário."""
     conn = conn_externa if conn_externa else conectar_bd()
     try:
         cursor = conn.cursor()
@@ -45,12 +55,13 @@ def _fetch_one(query, params=None, conn_externa=None):
         return dict(result) if result else None
     except sqlite3.Error as e:
         print(f"Erro em _fetch_one com query '{query[:50]}...': {e}")
-        return None
+        return None # Retorna None em caso de erro
     finally:
         if not conn_externa and conn:
             conn.close()
 
 def _execute_query(query, params=None, conn_externa=None):
+    """Executa uma query de modificação (INSERT, UPDATE, DELETE)."""
     conn = conn_externa if conn_externa else conectar_bd()
     try:
         cursor = conn.cursor()
@@ -59,17 +70,19 @@ def _execute_query(query, params=None, conn_externa=None):
         else:
             cursor.execute(query)
         conn.commit()
-        return cursor.lastrowid
+        return cursor.lastrowid # Útil para INSERTs com autoincrement
     except sqlite3.Error as e:
         print(f"Erro em _execute_query com query '{query[:50]}...': {e}")
-        if conn and not conn_externa:
+        if conn and not conn_externa: # Só faz rollback se a conexão foi aberta aqui e ainda existe
              conn.rollback()
         return None
     finally:
         if not conn_externa and conn:
             conn.close()
 
+# --- Funções para Clientes ---
 def get_all_clients():
+    """Retorna todos os clientes com as novas colunas."""
     query = """
         SELECT id, nome, idade, sexo, email, telefone, plano_id, instrutor_id, treino_id
         FROM clientes ORDER BY nome;
@@ -77,6 +90,7 @@ def get_all_clients():
     return _fetch_all(query)
 
 def add_client(nome, email, idade=None, sexo=None, telefone=None, plano_id=None, instrutor_id=None, treino_id=None):
+    """Adiciona um novo cliente."""
     query = """
         INSERT INTO clientes (nome, idade, sexo, email, telefone, plano_id, instrutor_id, treino_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -84,32 +98,43 @@ def add_client(nome, email, idade=None, sexo=None, telefone=None, plano_id=None,
     params = (nome, idade, sexo, email, telefone, plano_id, instrutor_id, treino_id)
     return _execute_query(query, params)
 
+# --- Funções para Instrutores ---
 def get_all_instructors():
+    """Retorna todos os instrutores."""
     query = "SELECT id, nome, especialidade FROM instrutores ORDER BY nome;"
     return _fetch_all(query)
 
 def add_instructor(nome, especialidade=None):
+    """Adiciona um novo instrutor."""
     query = "INSERT INTO instrutores (nome, especialidade) VALUES (?, ?)"
     return _execute_query(query, (nome, especialidade))
 
+# --- Funções para Planos ---
 def get_all_plans():
+    """Retorna todos os planos."""
     query = "SELECT id, nome, preco_mensal, duracao_meses FROM planos ORDER BY nome;"
     return _fetch_all(query)
 
 def add_plan(nome, preco_mensal, duracao_meses):
+    """Adiciona um novo plano."""
     query = "INSERT INTO planos (nome, preco_mensal, duracao_meses) VALUES (?, ?, ?)"
     return _execute_query(query, (nome, preco_mensal, duracao_meses))
 
+# --- Funções para Exercícios ---
 def get_all_exercises():
+    """Retorna todos os exercícios."""
     query = "SELECT id, nome, grupo_muscular FROM exercicios ORDER BY nome;"
     return _fetch_all(query)
 
 def add_exercise(nome, grupo_muscular=None):
+    """Adiciona um novo exercício."""
     query = "INSERT INTO exercicios (nome, grupo_muscular) VALUES (?, ?)"
     return _execute_query(query, (nome, grupo_muscular))
 
+# --- Funções para Treinos ---
 def add_treino(nome_treino, data_inicio, cliente_id=None, instrutor_id=None, plano_id=None,
                data_fim=None, objetivo=None, tipo_treino=None, descricao_treino=None):
+    """Adiciona um novo treino principal."""
     query = """
         INSERT INTO treinos 
             (nome_treino, cliente_id, instrutor_id, plano_id, data_inicio, data_fim, objetivo, tipo_treino, descricao_treino)
@@ -120,6 +145,7 @@ def add_treino(nome_treino, data_inicio, cliente_id=None, instrutor_id=None, pla
 
 def add_exercise_to_treino(treino_id, exercicio_id, series=None, repeticoes=None, carga=None,
                            descanso_segundos=None, ordem=None, observacoes_exercicio=None):
+    """Adiciona um exercício a um treino específico na tabela treino_exercicio."""
     query = """
         INSERT INTO treino_exercicio
             (treino_id, exercicio_id, series, repeticoes, carga, descanso_segundos, ordem, observacoes_exercicio)
@@ -129,6 +155,10 @@ def add_exercise_to_treino(treino_id, exercicio_id, series=None, repeticoes=None
     return _execute_query(query, params)
 
 def get_workouts_with_exercises(cliente_id=None, instrutor_id=None):
+    """
+    Filtra e mostra treinos e seus exercícios.
+    Retorna uma lista de treinos, onde cada treino contém uma lista de seus exercícios.
+    """
     conn = conectar_bd() # Usar uma conexão para toda a operação
     
     base_query_treinos = """
@@ -186,16 +216,19 @@ def get_workouts_with_exercises(cliente_id=None, instrutor_id=None):
     """
     
     for treino in treinos:
+        # Usar a mesma conexão 'conn' para buscar os exercícios
         exercicios_do_treino = _fetch_all(query_exercicios_treino, (treino['treino_id'],), conn_externa=conn)
         treino['exercicios'] = exercicios_do_treino
     
     if conn:
-        conn.close()
+        conn.close() # Fechar a conexão principal no final
 
     return treinos
 
+# --- Funções para Pagamentos ---
 def get_pagamentos_by_client_id(cliente_id):
     """Retorna todos os pagamentos de um cliente específico."""
+    # Assumindo que a FK para clientes existe na tabela pagamentos para integridade
     query = """
         SELECT p.id, p.cliente_id, c.nome as cliente_nome, p.data_pagamento, p.valor, p.pago
         FROM pagamentos p
@@ -206,10 +239,17 @@ def get_pagamentos_by_client_id(cliente_id):
     return _fetch_all(query, (cliente_id,))
 
 def add_pagamento(cliente_id, data_pagamento, valor, pago=0):
+    """Adiciona um novo pagamento."""
     query = "INSERT INTO pagamentos (cliente_id, data_pagamento, valor, pago) VALUES (?, ?, ?, ?)"
     return _execute_query(query, (cliente_id, data_pagamento, valor, pago))
 
+# --- Funções de Relatório/Dashboard (Exemplos) ---
 def get_clients_with_current_plan_info():
+    """
+    Lista todos os clientes e tenta encontrar informações do plano do seu treino mais recente.
+    Se o cliente tiver um plano_id direto, essa informação também pode ser usada.
+    Esta versão foca no plano do último treino.
+    """
     query = """
     SELECT
         c.id AS cliente_id,
@@ -241,6 +281,7 @@ def get_clients_with_current_plan_info():
     return _fetch_all(query)
 
 def get_payment_stats_for_client(cliente_id):
+    """Retorna o total de pagamentos e o último pagamento de um cliente."""
     query_total = """
         SELECT SUM(valor) as total_pago
         FROM pagamentos
@@ -266,21 +307,34 @@ def get_payment_stats_for_client(cliente_id):
     }
 
 def get_active_client_count_per_instructor():
+    """
+    Retorna quantos clientes distintos cada instrutor atende,
+    baseado em treinos que não têm data_fim ou cuja data_fim é no futuro.
+    """
     query = """
     SELECT
         i.id AS instrutor_id,
         i.nome AS instrutor_nome,
         i.especialidade AS instrutor_especialidade,
-        COUNT(DISTINCT t.cliente_id) AS numero_clientes_ativos
-    FROM instrutores i
-    LEFT JOIN treinos t ON i.id = t.instrutor_id 
-                       AND (t.data_fim IS NULL OR t.data_fim >= date('now'))
-    GROUP BY i.id, i.nome, i.especialidade
-    ORDER BY numero_clientes_ativos DESC, i.nome;
+        -- Conta os clientes distintos associados a cada instrutor.
+        -- Se 'c.id' for a chave primária da tabela 'clientes'.
+        COUNT(DISTINCT c.id) AS numero_clientes_ativos
+    FROM
+        instrutores i
+    LEFT JOIN
+        -- Faz a junção com a tabela 'clientes' para encontrar os clientes de cada instrutor.
+        -- A ligação é feita entre 'instrutores.id' e 'clientes.instrutor_id'.
+        clientes c ON i.id = c.instrutor_id
+    GROUP BY
+        i.id, i.nome, i.especialidade
+    ORDER BY
+        numero_clientes_ativos DESC, i.nome;
     """
     return _fetch_all(query)
 
+# --- Funções para Selectboxes em formulários (exemplos) ---
 def get_all_clients_for_select():
+    """Retorna (id, nome) de todos os clientes para selectboxes."""
     query = "SELECT id, nome FROM clientes ORDER BY nome ASC;"
     return _fetch_all(query) # _fetch_all já retorna lista de dicts
 
@@ -295,16 +349,22 @@ def get_all_plans_for_select():
     return _fetch_all(query)
 
 def get_all_exercises_for_select():
+    """Retorna (id, nome) de todos os exercícios globais para selectboxes."""
     query = "SELECT id, nome FROM exercicios ORDER BY nome ASC;"
     return _fetch_all(query)
 
 def get_all_treinos_for_select():
+    """Retorna (id, nome_treino) de todos os treinos para selectboxes."""
     query = "SELECT id, nome_treino FROM treinos WHERE nome_treino IS NOT NULL ORDER BY nome_treino ASC;"
     return _fetch_all(query)
 
 
 if __name__ == '__main__':
+    # Testes rápidos (descomente para testar individualmente após popular o banco)
     print("Executando testes do database.py...")
+    
+    # É importante que o banco 'academia.db' exista e esteja populado para os testes.
+    # Você pode rodar o script setup_database_academia_v3_simples.py primeiro.
 
     print("\n--- Testando get_all_clients() ---")
     todos_os_clientes = get_all_clients()
@@ -352,3 +412,45 @@ if __name__ == '__main__':
         print("Nenhuma informação de cliente com plano encontrada.")
 
     print("\nTestes concluídos.")
+
+
+#configurações de cards 
+
+def count_total_clients():
+    """Retorna o número total de clientes cadastrados."""
+    query = "SELECT COUNT(*) AS total_clientes FROM clientes;"
+    result = _fetch_one(query)
+    return result['total_clientes'] if result and 'total_clientes' in result else 0
+
+def count_total_intrutores():
+    """Retorna o número total de clientes cadastrados."""
+    query = "SELECT COUNT(*) AS total_instrutores FROM instrutores;"
+    result = _fetch_one(query)
+    return result['total_instrutores'] if result and 'total_instrutores' in result else 0
+
+def count_clientes_por_plano():
+    """
+    Retorna a contagem de clientes para cada plano.
+    Espera-se que a tabela 'clientes' tenha 'plano_id' e
+    a tabela 'planos' tenha 'id' e 'nome'.
+    """
+    query = """
+        SELECT
+            p.nome AS nome_plano,
+            COUNT(c.id) AS total_clientes
+        FROM clientes c
+        JOIN planos p ON c.plano_id = p.id
+        GROUP BY p.nome
+        ORDER BY p.nome;
+    """
+    return _fetch_all(query)
+
+def count_pagamentosn():
+
+    query ="""
+        SELECT COUNT(*) AS total_pago 
+        FROM pagamentos 
+        WHERE pago = 0; 
+        """
+    result = _fetch_one(query)
+    return result['total_pago'] if result and 'total_pago' in result else 0
