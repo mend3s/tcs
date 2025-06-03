@@ -104,11 +104,13 @@ if st.session_state["authentication_status"]:
         pagina_atual = None # Nenhuma página para mostrar
 
     # --- Conteúdo da Página Selecionada ---
+    
     if pagina_atual == "Dashboard":
         st.title("🏠 Dashboard")
         st.header(f"Olá, {st.session_state['name']}!") 
-total_clientes = database.count_total_clients()
-        total_instrutores = database.count_total_intrutores()
+        total_clientes = database.count_total_clientes()
+        total_instrutores = database.count_total_instrutores()
+
         dados_planos = database.count_clientes_por_plano()
         totalpago = database.count_pagamentosn()
 
@@ -199,12 +201,11 @@ total_clientes = database.count_total_clients()
                 margin: 16px auto;
             ">
                 <h2 style="color: white; margin-bottom: 10px; text-align: center; font-size: 2em; border-bottom: 1px solid rgba(255,255,255,0.3);">PAGAMENTO PENDENTE</h2>
-                <h1 style="margin-top: 10px; text-align: center;"> {totalpago}</h1>
+                <h1 style="color: white; margin-top: 10px; text-align: center;"> {totalpago}</h1>
             </div>    
             """
         st.markdown(card_pagamentos, unsafe_allow_html=True)
-
-
+        
     elif pagina_atual == "Clientes":
         st.title("👨‍💻 Gestão de Clientes")
         st.markdown("Gerencie os clientes da sua academia: visualize, adicione e veja seus planos.")
