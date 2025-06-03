@@ -66,15 +66,20 @@ def criar_tabelas(conn):
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS treinos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    cliente_id INTEGER,
-    instrutor_id INTEGER,
-    data_inicio DATE,
-    data_fim DATE,
-    plano_id INTEGER,
-    FOREIGN KEY (cliente_id) REFERENCES clientes (id) ON DELETE SET NULL,
-    FOREIGN KEY (instrutor_id) REFERENCES instrutores (id) ON DELETE SET NULL,
-    FOREIGN KEY (plano_id) REFERENCES planos (id) ON DELETE SET NULL)
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome_treino TEXT,
+        cliente_id INTEGER,
+        instrutor_id INTEGER,
+        plano_id INTEGER,
+        data_inicio DATE,
+        data_fim DATE,
+        objetivo TEXT,
+        tipo_treino TEXT,
+        descricao_treino TEXT,
+        FOREIGN KEY (cliente_id) REFERENCES clientes (id) ON DELETE SET NULL,
+        FOREIGN KEY (instrutor_id) REFERENCES instrutores (id) ON DELETE SET NULL,
+        FOREIGN KEY (plano_id) REFERENCES planos (id) ON DELETE SET NULL
+    )
     """)
     print("- Tabela 'treinos' verificada/criada.")
 
@@ -162,10 +167,17 @@ if __name__ == '__main__':
         conn = conectar_bd()
         criar_tabelas(conn)
 
+        print("\n--- Populando Tabelas com Dados dos CSVs (se existirem) ---")
+
         popular_tabela_csv_simples(conn, 'instrutores', 'instrutores.csv')
         popular_tabela_csv_simples(conn, 'planos', 'planos.csv')
         popular_tabela_csv_simples(conn, 'exercicios', 'exercicios.csv')
+        
         popular_tabela_csv_simples(conn, 'clientes', 'clientes_academia.csv')
+
+        print("\nAVISO IMPORTANTE: A tabela 'treinos' não está sendo populada por CSV neste script.")
+        print("Para que 'treino_exercicio' seja populada corretamente, a tabela 'treinos' deve")
+        print("conter os 'treino_id's referenciados no arquivo 'treino_exercicios.csv'.")
         popular_tabela_csv_simples(conn, 'treinos', 'treinos.csv')
         popular_tabela_csv_simples(conn, 'treino_exercicio', 'treino_exercicios.csv')
         

@@ -75,8 +75,8 @@ if st.session_state["authentication_status"]:
     icones_menu_base = ["🏠", "👥", "🏋️", "💳"]
     
     if st.session_state.get("role_usuario") == "admin":
-        opcoes_menu_pills = opcoes_menu_base + ["Configurações Admin"]
-        icones_menu_pills = icones_menu_base + ["⚙️"]
+        opcoes_menu_pills = opcoes_menu_base 
+        icones_menu_pills = icones_menu_base
     else:
         opcoes_menu_pills = opcoes_menu_base
         icones_menu_pills = icones_menu_base
@@ -104,11 +104,12 @@ if st.session_state["authentication_status"]:
         pagina_atual = None # Nenhuma página para mostrar
 
     # --- Conteúdo da Página Selecionada ---
+    
     if pagina_atual == "Dashboard":
         st.title("🏠 Dashboard")
         st.header(f"Olá, {st.session_state['name']}!") 
-        total_clientes = database.count_total_clients()
-        total_instrutores = database.count_total_intrutores()
+        total_clientes = database.count_total_clientes()
+        total_instrutores = database.count_total_instrutores()
         dados_planos = database.count_clientes_por_plano()
         totalpago = database.count_pagamentosn()
 
@@ -125,8 +126,10 @@ if st.session_state["authentication_status"]:
             lista_html_interna = "<p style='color: white; text-align: center;'>Nenhum dado de plano encontrado.</p>"
 
 # Criando as colunas para os dois primeiros cards
-        col1, col2 = st.columns(2)
-
+        col1, col2, col3 = st.columns(3)
+            # Card para Clientes por Plano
+            
+            
         with col1:
                 card_clientes = f"""
                 <div style="
@@ -144,7 +147,7 @@ if st.session_state["authentication_status"]:
                 </div>
                 """
                 st.markdown(card_clientes, unsafe_allow_html=True)
-
+                
         with col2:
                 card_instrutores = f"""
                 <div style="
@@ -162,10 +165,28 @@ if st.session_state["authentication_status"]:
                 </div>
                 """
                 st.markdown(card_instrutores, unsafe_allow_html=True)
-
-        st.markdown("---") # Linha divisória
-
             # Card para Clientes por Plano
+        
+        
+        with col3:
+
+            card_pagamentos = f"""
+                <div style="
+                    background-color: #F9A603; 
+                padding: 16px; 
+                border-radius: 25px; /* Arredondamento mais comum */
+                color: white; 
+                text-align: center; 
+                box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2); 
+                max-width: 300px; 
+                margin: 16px auto;
+                ">
+                    <h2 style="color: white; margin-bottom: 10px; font-size: 1.5em; border-bottom: 1px solid rgba(255,255,255,0.3);text-align: center;">PAGAMENTO PENDENTE</h2>
+                    <h1 style="color: white; margin-top: 0px; font-size: 2.5em; text-align: center;">{totalpago}</h1>
+                </div>
+                """
+            st.markdown(card_pagamentos, unsafe_allow_html=True)
+        st.markdown("---")
         card_clientes_por_plano = f"""
             <div style="
                 background-color: #66C5CC; 
@@ -184,27 +205,7 @@ if st.session_state["authentication_status"]:
             </div>    
             """
         st.markdown(card_clientes_por_plano, unsafe_allow_html=True)
-
-        st.markdown("---")
-
-        card_pagamentos = f"""
-            <div style="
-                background-color: #CC99FF; 
-                padding: 16px; 
-                border-radius: 25px; /* Arredondamento mais comum */
-                color: white; 
-                text-align: center;  
-                box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2); 
-                max-width: 300px; 
-                margin: 16px auto;
-            ">
-                <h2 style="color: white; margin-bottom: 10px; text-align: center; font-size: 2em; border-bottom: 1px solid rgba(255,255,255,0.3);">PAGAMENTO PENDENTE</h2>
-                <h1 style="color: white; margin-top: 10px; text-align: center;"> {totalpago}</h1>
-            </div>    
-            """
-        st.markdown(card_pagamentos, unsafe_allow_html=True)
-
-
+        
     elif pagina_atual == "Clientes":
         st.title("👨‍💻 Gestão de Clientes")
         st.markdown("Gerencie os clientes da sua academia: visualize, adicione e veja seus planos.")
@@ -244,56 +245,55 @@ if st.session_state["authentication_status"]:
         if tab_selecionada == "Cadastrar Novo Cliente":
             st.header("Cadastrar Novo Cliente")
 
-        with st.form("form_cadastro_cliente", clear_on_submit=True):
-            nome = st.text_input("Nome do Cliente", help="Nome completo do cliente.")
-            email = st.text_input("Email do Cliente", help="Email único do cliente.")
+            with st.form("form_cadastro_cliente", clear_on_submit=True):
+                nome = st.text_input("Nome do Cliente", help="Nome completo do cliente.")
+                email = st.text_input("Email do Cliente", help="Email único do cliente.")
             
-            col1, col2 = st.columns(2)
-            with col1:
-                idade = st.number_input("Idade", min_value=0, max_value=120, value=None, help="Idade do cliente.", format="%d")
-            with col2:
-                sexo = st.selectbox("Sexo", ["", "Masculino", "Feminino", "Outro"], index=0, help="Gênero do cliente.")
+                col1, col2 = st.columns(2)
+                with col1:
+                    idade = st.number_input("Idade", min_value=0, max_value=120, value=None, help="Idade do cliente.", format="%d")
+                with col2:
+                    sexo = st.selectbox("Sexo", ["", "Masculino", "Feminino", "Outro"], index=0, help="Gênero do cliente.")
             
-            telefone = st.text_input("Telefone", help="Telefone de contato (ex: (XX) XXXXX-XXXX).")
+                telefone = st.text_input("Telefone", help="Telefone de contato (ex: (XX) XXXXX-XXXX).")
 
-            # Carregar dados para as selectboxes
-            planos_disponiveis = database.get_all_plans_for_select()
-            instrutores_disponiveis = database.get_all_instructors_for_select()
+                planos_disponiveis = database.get_all_plans_for_select()
+                instrutores_disponiveis = database.get_all_instructors_for_select()
 
-            lista_planos_nomes = [p['nome'] for p in planos_disponiveis] if planos_disponiveis else []
-            lista_instrutores_nomes = [i['nome'] for i in instrutores_disponiveis] if instrutores_disponiveis else []
+                lista_planos_nomes = [p['nome'] for p in planos_disponiveis] if planos_disponiveis else []
+                lista_instrutores_nomes = [i['nome'] for i in instrutores_disponiveis] if instrutores_disponiveis else []
             
-            planos_nome_para_id = {p['nome']: p['id'] for p in planos_disponiveis} if planos_disponiveis else {}
-            instrutores_nome_para_id = {i['nome']: i['id'] for i in instrutores_disponiveis} if instrutores_disponiveis else {}
+                planos_nome_para_id = {p['nome']: p['id'] for p in planos_disponiveis} if planos_disponiveis else {}
+                instrutores_nome_para_id = {i['nome']: i['id'] for i in instrutores_disponiveis} if instrutores_disponiveis else {}
 
-            col3, col4 = st.columns(2)
-            with col3:
-                plano_selecionado_nome = None 
-                if lista_planos_nomes:
-                    plano_selecionado_nome = st.selectbox(
+                col3, col4 = st.columns(2)
+                with col3:
+                    plano_selecionado_nome = None 
+                    if lista_planos_nomes:
+                        plano_selecionado_nome = st.selectbox(
                         "Plano Associado", 
                         options=lista_planos_nomes, 
                         index=0, 
                         help="Plano que o cliente está associado."
-                    )
-                else:
-                    st.error("ERRO: Nenhum plano disponível. Cadastre planos primeiro (na página de planos).")
-                    plano_selecionado_nome = "" 
+                        )
+                    else:
+                        st.error("ERRO: Nenhum plano disponível. Cadastre planos primeiro (na página de planos).")
+                        plano_selecionado_nome = "" 
         
-            with col4:
-                instrutor_selecionado_nome = None 
-                if lista_instrutores_nomes:
-                    instrutor_selecionado_nome = st.selectbox(
+                with col4:
+                    instrutor_selecionado_nome = None 
+                    if lista_instrutores_nomes:
+                        instrutor_selecionado_nome = st.selectbox(
                         "Instrutor Principal", 
                         options=lista_instrutores_nomes, 
                         index=0, 
                         help="Instrutor principal do cliente."
-                    )
-                else:
-                    st.error("ERRO: Nenhum instrutor disponível. Cadastre instrutores primeiro (na página de instrutores).")
-                    instrutor_selecionado_nome = ""
+                        )
+                    else:
+                        st.error("ERRO: Nenhum instrutor disponível. Cadastre instrutores primeiro (na página de instrutores).")
+                        instrutor_selecionado_nome = ""
 
-            submitted = st.form_submit_button("Cadastrar Cliente")
+                submitted = st.form_submit_button("Cadastrar Cliente")
 
             if submitted:
                 if not nome:
@@ -316,7 +316,7 @@ if st.session_state["authentication_status"]:
                         st.success(f"Cliente '{nome}' cadastrado com sucesso! ID: {client_id}")
                     else:
                         st.error("Erro ao cadastrar cliente. Verifique se o email já existe ou outros dados.")
-                        
+
     elif pagina_atual == "Treinos":
         st.title("🏋️ Gerenciamento de Treinos")
 
@@ -660,16 +660,6 @@ if st.session_state["authentication_status"]:
                                 st.error("Falha ao registrar pagamento.")
                         else:
                             st.error("Cliente selecionado para pagamento não encontrado.")
-            
-
-    elif pagina_atual == "Configurações Admin":
-        st.title("⚙️ Configurações Administrativas")
-        st.header("Painel do Administrador")
-        if st.session_state.get("role_usuario") == "admin":
-            st.write("Bem-vindo à área de configurações do administrador.")
-            # ... (seu código para a página de Admin) ...
-        else:
-            st.error("Acesso Negado. Esta área é restrita a administradores.")
 
 elif st.session_state["authentication_status"] is False:
     st.error('Nome de usuário/senha incorretos.')
