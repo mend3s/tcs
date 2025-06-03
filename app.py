@@ -75,8 +75,8 @@ if st.session_state["authentication_status"]:
     icones_menu_base = ["🏠", "👥", "🏋️", "💳"]
     
     if st.session_state.get("role_usuario") == "admin":
-        opcoes_menu_pills = opcoes_menu_base + ["Configurações Admin"]
-        icones_menu_pills = icones_menu_base + ["⚙️"]
+        opcoes_menu_pills = opcoes_menu_base 
+        icones_menu_pills = icones_menu_base
     else:
         opcoes_menu_pills = opcoes_menu_base
         icones_menu_pills = icones_menu_base
@@ -110,7 +110,6 @@ if st.session_state["authentication_status"]:
         st.header(f"Olá, {st.session_state['name']}!") 
         total_clientes = database.count_total_clientes()
         total_instrutores = database.count_total_instrutores()
-
         dados_planos = database.count_clientes_por_plano()
         totalpago = database.count_pagamentosn()
 
@@ -127,8 +126,10 @@ if st.session_state["authentication_status"]:
             lista_html_interna = "<p style='color: white; text-align: center;'>Nenhum dado de plano encontrado.</p>"
 
 # Criando as colunas para os dois primeiros cards
-        col1, col2 = st.columns(2)
-
+        col1, col2, col3 = st.columns(3)
+            # Card para Clientes por Plano
+            
+            
         with col1:
                 card_clientes = f"""
                 <div style="
@@ -146,7 +147,7 @@ if st.session_state["authentication_status"]:
                 </div>
                 """
                 st.markdown(card_clientes, unsafe_allow_html=True)
-
+                
         with col2:
                 card_instrutores = f"""
                 <div style="
@@ -164,10 +165,28 @@ if st.session_state["authentication_status"]:
                 </div>
                 """
                 st.markdown(card_instrutores, unsafe_allow_html=True)
-
-        st.markdown("---") # Linha divisória
-
             # Card para Clientes por Plano
+        
+        
+        with col3:
+
+            card_pagamentos = f"""
+                <div style="
+                    background-color: #F9A603; 
+                padding: 16px; 
+                border-radius: 25px; /* Arredondamento mais comum */
+                color: white; 
+                text-align: center; 
+                box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2); 
+                max-width: 300px; 
+                margin: 16px auto;
+                ">
+                    <h2 style="color: white; margin-bottom: 10px; font-size: 1.5em; border-bottom: 1px solid rgba(255,255,255,0.3);text-align: center;">PAGAMENTO PENDENTE</h2>
+                    <h1 style="color: white; margin-top: 0px; font-size: 2.5em; text-align: center;">{totalpago}</h1>
+                </div>
+                """
+            st.markdown(card_pagamentos, unsafe_allow_html=True)
+        st.markdown("---")
         card_clientes_por_plano = f"""
             <div style="
                 background-color: #66C5CC; 
@@ -186,25 +205,6 @@ if st.session_state["authentication_status"]:
             </div>    
             """
         st.markdown(card_clientes_por_plano, unsafe_allow_html=True)
-
-        st.markdown("---")
-
-        card_pagamentos = f"""
-            <div style="
-                background-color: #CC99FF; 
-                padding: 16px; 
-                border-radius: 25px; /* Arredondamento mais comum */
-                color: white; 
-                text-align: center;  
-                box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2); 
-                max-width: 300px; 
-                margin: 16px auto;
-            ">
-                <h2 style="color: white; margin-bottom: 10px; text-align: center; font-size: 2em; border-bottom: 1px solid rgba(255,255,255,0.3);">PAGAMENTO PENDENTE</h2>
-                <h1 style="color: white; margin-top: 10px; text-align: center;"> {totalpago}</h1>
-            </div>    
-            """
-        st.markdown(card_pagamentos, unsafe_allow_html=True)
         
     elif pagina_atual == "Clientes":
         st.title("👨‍💻 Gestão de Clientes")
@@ -660,16 +660,6 @@ if st.session_state["authentication_status"]:
                                 st.error("Falha ao registrar pagamento.")
                         else:
                             st.error("Cliente selecionado para pagamento não encontrado.")
-            
-
-    elif pagina_atual == "Configurações Admin":
-        st.title("⚙️ Configurações Administrativas")
-        st.header("Painel do Administrador")
-        if st.session_state.get("role_usuario") == "admin":
-            st.write("Bem-vindo à área de configurações do administrador.")
-            # ... (seu código para a página de Admin) ...
-        else:
-            st.error("Acesso Negado. Esta área é restrita a administradores.")
 
 elif st.session_state["authentication_status"] is False:
     st.error('Nome de usuário/senha incorretos.')
