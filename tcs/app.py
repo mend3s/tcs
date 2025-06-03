@@ -244,56 +244,55 @@ if st.session_state["authentication_status"]:
         if tab_selecionada == "Cadastrar Novo Cliente":
             st.header("Cadastrar Novo Cliente")
 
-        with st.form("form_cadastro_cliente", clear_on_submit=True):
-            nome = st.text_input("Nome do Cliente", help="Nome completo do cliente.")
-            email = st.text_input("Email do Cliente", help="Email único do cliente.")
+            with st.form("form_cadastro_cliente", clear_on_submit=True):
+                nome = st.text_input("Nome do Cliente", help="Nome completo do cliente.")
+                email = st.text_input("Email do Cliente", help="Email único do cliente.")
             
-            col1, col2 = st.columns(2)
-            with col1:
-                idade = st.number_input("Idade", min_value=0, max_value=120, value=None, help="Idade do cliente.", format="%d")
-            with col2:
-                sexo = st.selectbox("Sexo", ["", "Masculino", "Feminino", "Outro"], index=0, help="Gênero do cliente.")
+                col1, col2 = st.columns(2)
+                with col1:
+                    idade = st.number_input("Idade", min_value=0, max_value=120, value=None, help="Idade do cliente.", format="%d")
+                with col2:
+                    sexo = st.selectbox("Sexo", ["", "Masculino", "Feminino", "Outro"], index=0, help="Gênero do cliente.")
             
-            telefone = st.text_input("Telefone", help="Telefone de contato (ex: (XX) XXXXX-XXXX).")
+                telefone = st.text_input("Telefone", help="Telefone de contato (ex: (XX) XXXXX-XXXX).")
 
-            # Carregar dados para as selectboxes
-            planos_disponiveis = database.get_all_plans_for_select()
-            instrutores_disponiveis = database.get_all_instructors_for_select()
+                planos_disponiveis = database.get_all_plans_for_select()
+                instrutores_disponiveis = database.get_all_instructors_for_select()
 
-            lista_planos_nomes = [p['nome'] for p in planos_disponiveis] if planos_disponiveis else []
-            lista_instrutores_nomes = [i['nome'] for i in instrutores_disponiveis] if instrutores_disponiveis else []
+                lista_planos_nomes = [p['nome'] for p in planos_disponiveis] if planos_disponiveis else []
+                lista_instrutores_nomes = [i['nome'] for i in instrutores_disponiveis] if instrutores_disponiveis else []
             
-            planos_nome_para_id = {p['nome']: p['id'] for p in planos_disponiveis} if planos_disponiveis else {}
-            instrutores_nome_para_id = {i['nome']: i['id'] for i in instrutores_disponiveis} if instrutores_disponiveis else {}
+                planos_nome_para_id = {p['nome']: p['id'] for p in planos_disponiveis} if planos_disponiveis else {}
+                instrutores_nome_para_id = {i['nome']: i['id'] for i in instrutores_disponiveis} if instrutores_disponiveis else {}
 
-            col3, col4 = st.columns(2)
-            with col3:
-                plano_selecionado_nome = None 
-                if lista_planos_nomes:
-                    plano_selecionado_nome = st.selectbox(
+                col3, col4 = st.columns(2)
+                with col3:
+                    plano_selecionado_nome = None 
+                    if lista_planos_nomes:
+                        plano_selecionado_nome = st.selectbox(
                         "Plano Associado", 
                         options=lista_planos_nomes, 
                         index=0, 
                         help="Plano que o cliente está associado."
-                    )
-                else:
-                    st.error("ERRO: Nenhum plano disponível. Cadastre planos primeiro (na página de planos).")
-                    plano_selecionado_nome = "" 
+                        )
+                    else:
+                        st.error("ERRO: Nenhum plano disponível. Cadastre planos primeiro (na página de planos).")
+                        plano_selecionado_nome = "" 
         
-            with col4:
-                instrutor_selecionado_nome = None 
-                if lista_instrutores_nomes:
-                    instrutor_selecionado_nome = st.selectbox(
+                with col4:
+                    instrutor_selecionado_nome = None 
+                    if lista_instrutores_nomes:
+                        instrutor_selecionado_nome = st.selectbox(
                         "Instrutor Principal", 
                         options=lista_instrutores_nomes, 
                         index=0, 
                         help="Instrutor principal do cliente."
-                    )
-                else:
-                    st.error("ERRO: Nenhum instrutor disponível. Cadastre instrutores primeiro (na página de instrutores).")
-                    instrutor_selecionado_nome = ""
+                        )
+                    else:
+                        st.error("ERRO: Nenhum instrutor disponível. Cadastre instrutores primeiro (na página de instrutores).")
+                        instrutor_selecionado_nome = ""
 
-            submitted = st.form_submit_button("Cadastrar Cliente")
+                submitted = st.form_submit_button("Cadastrar Cliente")
 
             if submitted:
                 if not nome:
@@ -316,7 +315,7 @@ if st.session_state["authentication_status"]:
                         st.success(f"Cliente '{nome}' cadastrado com sucesso! ID: {client_id}")
                     else:
                         st.error("Erro ao cadastrar cliente. Verifique se o email já existe ou outros dados.")
-                        
+
     elif pagina_atual == "Treinos":
         st.title("🏋️ Gerenciamento de Treinos")
 
