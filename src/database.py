@@ -276,7 +276,7 @@ def get_clients_with_current_plan_info():
         FROM treinos
     ) t ON c.id = t.cliente_id AND t.rn = 1 -- Pega o treino mais recente por cliente
     LEFT JOIN planos p_treino ON t.plano_id = p_treino.id -- Join para o plano do último treino
-    ORDER BY c.nome;
+    ORDER BY c.id;
     """
     return _fetch_all(query)
 
@@ -413,16 +413,15 @@ if __name__ == '__main__':
 
     print("\nTestes concluídos.")
 
-
 #configurações de cards 
 
-def count_total_clients():
+def count_total_clientes():
     """Retorna o número total de clientes cadastrados."""
     query = "SELECT COUNT(*) AS total_clientes FROM clientes;"
     result = _fetch_one(query)
     return result['total_clientes'] if result and 'total_clientes' in result else 0
 
-def count_total_intrutores():
+def count_total_instrutores():
     """Retorna o número total de clientes cadastrados."""
     query = "SELECT COUNT(*) AS total_instrutores FROM instrutores;"
     result = _fetch_one(query)
