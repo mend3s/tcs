@@ -210,46 +210,112 @@ if st.session_state["authentication_status"]:
         st.title("👨‍💻 Gestão de Clientes")
         st.markdown("Gerencie os clientes da sua academia: visualize, adicione e veja seus planos.")
 
-        # --- Seção de Listagem de Clientes ---
-        st.header("Lista de Clientes e Seus Planos")
+        tab_selecionada = st.radio("Escolha uma opção", ["Lista de Clientes", "Cadastrar Novo Cliente"])
 
-        # Carregar dados dos clientes com informações de plano
-        # Certifique-se que get_clients_with_current_plan_info está no seu database.py
-        clientes_info = database.get_clients_with_current_plan_info()
+        if tab_selecionada == "Lista de Clientes":
+            st.header("Lista de Clientes e Seus Planos")
 
-        if clientes_info:
-            # Convertendo para DataFrame para melhor visualização e manipulação (opcional, mas recomendado)
-            df_clientes = pd.DataFrame(clientes_info)
+            clientes_info = database.get_clients_with_current_plan_info()
+
+            if clientes_info:
+                df_clientes = pd.DataFrame(clientes_info)
             
-            # Renomear colunas para exibição amigável
-            df_clientes_display = df_clientes[[
+                df_clientes_display = df_clientes[[ 
                 'cliente_nome', 
                 'cliente_email', 
                 'cliente_telefone', 
-                'plano_direto_cliente', 
-                'plano_ultimo_treino', 
-                'ultimo_treino_nome',
-                'ultimo_treino_data_inicio'
-            ]].copy()
+                'plano_direto_cliente',
+                ]].copy()
             
-            df_clientes_display.columns = [
+                df_clientes_display.columns = [
                 'Nome do Cliente', 
                 'Email', 
                 'Telefone', 
-                'Plano Direto', 
-                'Plano Último Treino', 
-                'Último Treino', 
-                'Início Último Treino'
-            ]
+                'Plano Associado (Direto)'
+                ]
 
-            # Campo de filtro de clientes (nome)
-            filtro_cliente_nome = st.text_input("Filtrar clientes por nome:", "")
-            if filtro_cliente_nome:
-                df_clientes_display = df_clientes_display[df_clientes_display['Nome do Cliente'].str.contains(filtro_cliente_nome, case=False, na=False)]
+                filtro_cliente_nome = st.text_input("Filtrar clientes por nome:", "")
+                if filtro_cliente_nome:
+                    df_clientes_display = df_clientes_display[df_clientes_display['Nome do Cliente'].str.contains(filtro_cliente_nome, case=False, na=False)]
 
-            st.dataframe(df_clientes_display, use_container_width=True)
-        else:
-            st.info("Nenhum cliente cadastrado ainda.")
+                st.dataframe(df_clientes_display, use_container_width=True)
+            else:
+                st.info("Nenhum cliente cadastrado ainda.")
+
+        if tab_selecionada == "Cadastrar Novo Cliente":
+            st.header("Cadastrar Novo Cliente")
+
+            with st.form("form_cadastro_cliente", clear_on_submit=True):
+                nome = st.text_input("Nome do Cliente", help="Nome completo do cliente.")
+                email = st.text_input("Email do Cliente", help="Email único do cliente.")
+            
+                col1, col2 = st.columns(2)
+                with col1:
+                    idade = st.number_input("Idade", min_value=0, max_value=120, value=None, help="Idade do cliente.", format="%d")
+                with col2:
+                    sexo = st.selectbox("Sexo", ["", "Masculino", "Feminino", "Outro"], index=0, help="Gênero do cliente.")
+            
+                telefone = st.text_input("Telefone", help="Telefone de contato (ex: (XX) XXXXX-XXXX).")
+
+                planos_disponiveis = database.get_all_plans_for_select()
+                instrutores_disponiveis = database.get_all_instructors_for_select()
+
+                lista_planos_nomes = [p['nome'] for p in planos_disponiveis] if planos_disponiveis else []
+                lista_instrutores_nomes = [i['nome'] for i in instrutores_disponiveis] if instrutores_disponiveis else []
+            
+                planos_nome_para_id = {p['nome']: p['id'] for p in planos_disponiveis} if planos_disponiveis else {}
+                instrutores_nome_para_id = {i['nome']: i['id'] for i in instrutores_disponiveis} if instrutores_disponiveis else {}
+
+                col3, col4 = st.columns(2)
+                with col3:
+                    plano_selecionado_nome = None 
+                    if lista_planos_nomes:
+                        plano_selecionado_nome = st.selectbox(
+                        "Plano Associado", 
+                        options=lista_planos_nomes, 
+                        index=0, 
+                        help="Plano que o cliente está associado."
+                        )
+                    else:
+                        st.error("ERRO: Nenhum plano disponível. Cadastre planos primeiro (na página de planos).")
+                        plano_selecionado_nome = "" 
+        
+                with col4:
+                    instrutor_selecionado_nome = None 
+                    if lista_instrutores_nomes:
+                        instrutor_selecionado_nome = st.selectbox(
+                        "Instrutor Principal", 
+                        options=lista_instrutores_nomes, 
+                        index=0, 
+                        help="Instrutor principal do cliente."
+                        )
+                    else:
+                        st.error("ERRO: Nenhum instrutor disponível. Cadastre instrutores primeiro (na página de instrutores).")
+                        instrutor_selecionado_nome = ""
+
+                submitted = st.form_submit_button("Cadastrar Cliente")
+
+            if submitted:
+                if not nome:
+                    st.error("Nome do Cliente é obrigatório.")
+                elif not email:
+                    st.error("Email do Cliente é obrigatório.")
+                elif "@" not in email:
+                    st.error("Por favor, insira um email válido.")
+                elif not plano_selecionado_nome: 
+                    st.error("Plano Associado é obrigatório e nenhum plano está disponível ou foi selecionado.")
+                elif not instrutor_selecionado_nome: 
+                    st.error("Instrutor Principal é obrigatório e nenhum instrutor está disponível ou foi selecionado.")
+                else:
+                    plano_id = planos_nome_para_id.get(plano_selecionado_nome)
+                    instrutor_id = instrutores_nome_para_id.get(instrutor_selecionado_nome)
+                    treino_id = None
+                    
+                    client_id = database.add_client(nome, email, idade, sexo, telefone, plano_id, instrutor_id, treino_id)
+                    if client_id:
+                        st.success(f"Cliente '{nome}' cadastrado com sucesso! ID: {client_id}")
+                    else:
+                        st.error("Erro ao cadastrar cliente. Verifique se o email já existe ou outros dados.")
 
     elif pagina_atual == "Treinos":
         st.title("🏋️ Gerenciamento de Treinos")

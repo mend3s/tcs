@@ -276,7 +276,7 @@ def get_clients_with_current_plan_info():
         FROM treinos
     ) t ON c.id = t.cliente_id AND t.rn = 1 -- Pega o treino mais recente por cliente
     LEFT JOIN planos p_treino ON t.plano_id = p_treino.id -- Join para o plano do último treino
-    ORDER BY c.nome;
+    ORDER BY c.id;
     """
     return _fetch_all(query)
 
