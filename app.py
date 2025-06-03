@@ -3,11 +3,14 @@ import streamlit as st
 import streamlit_pills as stp
 import pandas as pd
 from src import database
+from datetime import date, timedelta
 # from src import database # Mantenha para suas funções de BD
 
 import streamlit_authenticator as stauth # Biblioteca de autenticação
 import yaml
 from yaml.loader import SafeLoader # Para carregar o YAML de forma segura
+
+conn = database.conectar_bd() 
 
 # --- Configuração da Página (DEVE SER A PRIMEIRA CHAMADA DO STREAMLIT) ---
 st.set_page_config(
@@ -159,14 +162,349 @@ if st.session_state["authentication_status"]:
             st.info("Nenhum cliente cadastrado ainda.")
 
     elif pagina_atual == "Treinos":
-        st.title("🏋️ Treinos")
-        st.header("Gerenciamento de Treinos")
-        # ... (seu código para a página de Treinos) ...
+        st.title("🏋️ Gerenciamento de Treinos")
+
+        tab_visualizar, tab_cadastrar_treino_exercicios, tab_banco_exercicios = st.tabs([
+            "Consultar Treinos", "Cadastrar Novo Treino Completo", "Banco de Exercícios"
+        ])
+
+        with tab_visualizar:
+            st.subheader("Consultar Treinos Existentes")
+            try:
+                # Carregar dados para filtros
+                clientes_select_filtro = database.get_all_clients_for_select()
+                instrutores_select_filtro = database.get_all_instructors_for_select()
+
+                opcoes_clientes_filtro = {"-- Todos os Clientes --": None}
+                if clientes_select_filtro:
+                    for c in clientes_select_filtro: 
+                        if c.get('nome'): opcoes_clientes_filtro[c['nome']] = c['id']
+                
+                opcoes_instrutores_filtro = {"-- Todos os Instrutores --": None}
+                if instrutores_select_filtro:
+                    for i in instrutores_select_filtro: 
+                        if i.get('nome'): opcoes_instrutores_filtro[i['nome']] = i['id']
+
+                col_f1, col_f2 = st.columns(2)
+                with col_f1:
+                    cliente_filtro_nome_sel = st.selectbox("Filtrar por Cliente:", list(opcoes_clientes_filtro.keys()), key="filtro_cliente_treino_page")
+                with col_f2:
+                    instrutor_filtro_nome_sel = st.selectbox("Filtrar por Instrutor:", list(opcoes_instrutores_filtro.keys()), key="filtro_instrutor_treino_page")
+                
+                cliente_id_para_filtro = opcoes_clientes_filtro.get(cliente_filtro_nome_sel)
+                instrutor_id_para_filtro = opcoes_instrutores_filtro.get(instrutor_filtro_nome_sel)
+
+                # Buscar treinos com base nos filtros
+                treinos_encontrados_data = database.get_workouts_with_exercises(
+                    cliente_id=cliente_id_para_filtro, 
+                    instrutor_id=instrutor_id_para_filtro
+                ) 
+
+                if treinos_encontrados_data:
+                    st.write(f"Encontrados {len(treinos_encontrados_data)} treinos:")
+                    for treino_idx, treino_info in enumerate(treinos_encontrados_data):
+                        exp_label = f"**{treino_info.get('nome_treino', f'Treino ID: {treino_info.get('treino_id')}')}**"
+                        if treino_info.get('cliente_nome'): exp_label += f" - Cliente: {treino_info['cliente_nome']}"
+                        if treino_info.get('instrutor_nome'): exp_label += f" - Instrutor: {treino_info['instrutor_nome']}"
+                        
+                        with st.expander(exp_label):
+                            st.markdown(f"**ID do Treino:** {treino_info.get('treino_id')}")
+                            st.markdown(f"**Objetivo:** {treino_info.get('objetivo', 'N/A')} | **Tipo:** {treino_info.get('tipo_treino', 'N/A')}")
+                            st.markdown(f"**Descrição:** {treino_info.get('descricao_treino', 'N/A')}")
+                            st.markdown(f"**Data Início:** {treino_info.get('data_inicio', 'N/A')} | **Data Fim:** {treino_info.get('data_fim', 'N/A')}")
+                            st.markdown(f"**Plano Associado:** {treino_info.get('plano_nome', 'N/A')}")
+                            
+                            exercicios_deste_treino = treino_info.get('exercicios')
+                            if exercicios_deste_treino:
+                                st.markdown("**Exercícios do Treino:**")
+                                df_ex = pd.DataFrame(exercicios_deste_treino)
+                                cols_ex_ver = ['ordem', 'exercicio_nome', 'series', 'repeticoes', 'carga', 'descanso_segundos', 'observacoes_exercicio']
+                                cols_ex_ver_existentes = [col for col in cols_ex_ver if col in df_ex.columns]
+                                st.table(df_ex[cols_ex_ver_existentes])
+                            else:
+                                st.info("Este treino não possui exercícios detalhados.")
+                else:
+                    st.info("Nenhum treino encontrado com os filtros aplicados.")
+            except Exception as e:
+                st.error(f"Erro ao carregar ou filtrar treinos: {e}")
+
+            st.markdown("---")
+            st.subheader("Clientes Ativos por Instrutor")
+            try:
+                instrutor_clientes_data = database.get_active_client_count_per_instructor() # Passa conn implicitamente
+                if instrutor_clientes_data:
+                    df_instrutor_clientes = pd.DataFrame(instrutor_clientes_data)
+                    col_instr_cli_display = ['instrutor_nome', 'instrutor_especialidade', 'numero_clientes_ativos']
+                    col_instr_cli_existentes = [col for col in col_instr_cli_display if col in df_instrutor_clientes.columns]
+                    st.dataframe(df_instrutor_clientes[col_instr_cli_existentes], use_container_width=True, hide_index=True)
+                else:
+                    st.info("Nenhuma informação de clientes por instrutor disponível.")
+            except Exception as e:
+                st.error(f"Erro ao carregar contagem de clientes por instrutor: {e}")
+
+
+        with tab_cadastrar_treino_exercicios:
+            st.subheader("Cadastrar Novo Treino e Adicionar Exercícios")
+
+            # Passo 1: Dados do Treino Principal
+            with st.form("form_dados_treino_principal_multi_tab", clear_on_submit=False):
+                st.markdown("##### 1. Detalhes do Treino Principal")
+                form_nome_t_p_val = st.text_input("Nome do Treino*", key="form_nome_t_p_multi_val")
+                form_data_inicio_t_p_val = st.date_input("Data de Início*", value=date.today(), key="form_data_inicio_t_p_multi_val")
+                form_data_fim_t_p_val = st.date_input("Data de Fim (Opcional)", value=None, key="form_data_fim_t_p_multi_val")
+                form_desc_t_p_val = st.text_area("Descrição", key="form_desc_t_p_multi_val")
+                form_tipo_t_p_val = st.text_input("Tipo (Ex: A, Full Body)", key="form_tipo_t_p_multi_val")
+                form_obj_t_p_val = st.text_input("Objetivo (Ex: Hipertrofia)", key="form_obj_t_p_multi_val")
+
+                form_op_cli_cad, form_op_inst_cad, form_op_plan_cad = {"-- Nenhum --": None}, {"-- Nenhum --": None}, {"-- Nenhum --": None}
+                try:
+                    clientes_s_form = database.get_all_clients_for_select()
+                    instrutores_s_form = database.get_all_instructors_for_select()
+                    planos_s_form = database.get_all_plans_for_select()
+
+                    if clientes_s_form:
+                        for c_ in clientes_s_form: 
+                            if c_.get('nome'): form_op_cli_cad[c_['nome']] = c_['id']
+                    if instrutores_s_form:
+                        for i_ in instrutores_s_form: 
+                            if i_.get('nome'): form_op_inst_cad[i_['nome']] = i_['id']
+                    if planos_s_form:
+                        for p_ in planos_s_form: 
+                            if p_.get('nome'): form_op_plan_cad[p_['nome']] = p_['id']
+                except Exception as e:
+                    st.warning(f"Erro ao carregar opções para formulário de treino (cadastro): {e}")
+
+                form_cliente_nome_cad = st.selectbox("Cliente (Opcional):", list(form_op_cli_cad.keys()), key="form_cliente_t_p_multi_cad")
+                form_instrutor_nome_cad = st.selectbox("Instrutor (Opcional):", list(form_op_inst_cad.keys()), key="form_instrutor_t_p_multi_cad")
+                form_plano_nome_cad = st.selectbox("Plano (Opcional):", list(form_op_plan_cad.keys()), key="form_plano_t_p_multi_cad")
+                
+                submit_passo1_cad = st.form_submit_button("Confirmar Dados do Treino e Prosseguir para Exercícios")
+
+                if submit_passo1_cad:
+                    if not form_nome_t_p_val:
+                        st.warning("Nome do treino é obrigatório.")
+                    else:
+                        st.session_state.nome_treino_sendo_criado = form_nome_t_p_val
+                        st.session_state.dados_treino_principal_temp = {
+                            "nome_treino": form_nome_t_p_val, 
+                            "data_inicio": form_data_inicio_t_p_val.isoformat(),
+                            "data_fim": form_data_fim_t_p_val.isoformat() if form_data_fim_t_p_val else None,
+                            "descricao_treino": form_desc_t_p_val, "tipo_treino": form_tipo_t_p_val,
+                            "objetivo": form_obj_t_p_val,
+                            "cliente_id": form_op_cli_cad.get(form_cliente_nome_cad),
+                            "instrutor_id": form_op_inst_cad.get(form_instrutor_nome_cad),
+                            "plano_id": form_op_plan_cad.get(form_plano_nome_cad)
+                        }
+                        st.session_state.exercicios_para_treino_atual = [] 
+                        st.session_state.proxima_ordem_exercicio = 1
+                        st.info(f"Dados do treino '{form_nome_t_p_val}' confirmados. Adicione os exercícios abaixo.")
+                        
+            if st.session_state.get("nome_treino_sendo_criado"): 
+                st.markdown("---")
+                st.markdown(f"##### 2. Adicionar Exercícios ao Treino: **{st.session_state.nome_treino_sendo_criado}**")
+                
+                form_op_ex_globais_cad = {"-- Selecione --": None}
+                try:
+                    exercicios_globais_cad = database.get_all_exercises_for_select()
+                    if exercicios_globais_cad:
+                        for ex_g in exercicios_globais_cad: 
+                            if ex_g.get('nome'): form_op_ex_globais_cad[ex_g['nome']] = ex_g['id']
+                except Exception as e:
+                    st.error(f"Erro ao carregar exercícios globais para o formulário (cadastro): {e}")
+                    
+                with st.form("form_add_exercicio_lista_cad", clear_on_submit=True):
+                    form_ex_nome_sel_cad = st.selectbox("Exercício Global*", list(form_op_ex_globais_cad.keys()), key="form_sel_ex_para_lista_cad")
+                    form_ordem_ex_cad = st.number_input("Ordem*", min_value=1, value=st.session_state.proxima_ordem_exercicio, step=1, key="form_ordem_ex_lista_cad")
+                    form_series_ex_cad = st.text_input("Séries*", key="form_series_ex_lista_cad")
+                    form_reps_ex_cad = st.text_input("Repetições*", key="form_reps_ex_lista_cad")
+                    form_carga_ex_cad = st.text_input("Carga", key="form_carga_ex_lista_cad")
+                    form_descanso_ex_cad = st.number_input("Descanso (segundos)", min_value=0, step=15, key="form_descanso_ex_lista_cad")
+                    form_obs_ex_cad = st.text_area("Observações", key="form_obs_ex_lista_cad")
+                    
+                    add_ex_lista_btn_cad = st.form_submit_button("➕ Adicionar à Lista")
+
+                    if add_ex_lista_btn_cad:
+                        if form_ex_nome_sel_cad != "-- Selecione --" and form_series_ex_cad and form_reps_ex_cad:
+                            form_ex_id_cad = form_op_ex_globais_cad.get(form_ex_nome_sel_cad) 
+                            if form_ex_id_cad is not None:
+                                st.session_state.exercicios_para_treino_atual.append({
+                                    "exercicio_id": form_ex_id_cad, "nome_exercicio": form_ex_nome_sel_cad, "ordem": form_ordem_ex_cad,
+                                    "series": form_series_ex_cad, "repeticoes": form_reps_ex_cad, "carga": form_carga_ex_cad,
+                                    "descanso_segundos": form_descanso_ex_cad, "observacoes_exercicio": form_obs_ex_cad
+                                })
+                                st.success(f"'{form_ex_nome_sel_cad}' adicionado à lista.")
+                                st.session_state.exercicios_para_treino_atual.sort(key=lambda x: x['ordem'])
+                                st.session_state.proxima_ordem_exercicio = max(ex_['ordem'] for ex_ in st.session_state.exercicios_para_treino_atual) + 1 if st.session_state.exercicios_para_treino_atual else 1
+                            else:
+                                st.error(f"Exercício '{form_ex_nome_sel_cad}' não encontrado no mapeamento.")
+                        else:
+                            st.warning("Selecione um exercício e preencha Séries e Repetições.")
+                
+                if st.session_state.exercicios_para_treino_atual:
+                    st.markdown("**Exercícios na lista para este treino:**")
+                    df_ex_lista_cad = pd.DataFrame(st.session_state.exercicios_para_treino_atual)
+                    cols_ex_df_disp_cad = ['ordem', 'nome_exercicio', 'series', 'repeticoes', 'carga', 'descanso_segundos', 'observacoes_exercicio']
+                    cols_ex_df_exist_cad = [col_ for col_ in cols_ex_df_disp_cad if col_ in df_ex_lista_cad.columns]
+                    st.table(df_ex_lista_cad[cols_ex_df_exist_cad])
+                    if st.button("🗑️ Limpar todos os exercícios da lista", key="btn_limpar_lista_ex_form_cad"):
+                        st.session_state.exercicios_para_treino_atual = []
+                        st.session_state.proxima_ordem_exercicio = 1
+                        st.rerun()
+
+                st.markdown("---")
+                if st.button("💾 Salvar Treino Completo com Exercícios", type="primary", use_container_width=True, key="btn_salvar_treino_completo_form_cad"):
+                    dados_treino_principal_final = st.session_state.get("dados_treino_principal_temp", {})
+                    if not dados_treino_principal_final or not dados_treino_principal_final.get("nome_treino"):
+                        st.error("Dados do treino principal não foram confirmados. Preencha e confirme o Passo 1.")
+                    elif not st.session_state.exercicios_para_treino_atual:
+                        st.error("Adicione pelo menos um exercício à lista (Passo 2).")
+                    else:
+                        novo_treino_id_db = database.add_treino(
+                        dados_treino_principal_final['nome_treino'],
+                        dados_treino_principal_final['data_inicio'],
+                        cliente_id=dados_treino_principal_final.get('cliente_id'), # Exemplo, ajuste conforme seus dados
+                        instrutor_id=dados_treino_principal_final.get('instrutor_id'), # Exemplo
+                        plano_id=dados_treino_principal_final.get('plano_id'), # Exemplo
+                        data_fim=dados_treino_principal_final.get('data_fim'), # Exemplo
+                        objetivo=dados_treino_principal_final.get('objetivo'), # Exemplo
+                        tipo_treino=dados_treino_principal_final.get('tipo_treino'), # Exemplo
+                        descricao_treino=dados_treino_principal_final.get('descricao_treino')
+                        # Remova a linha: conn_externa=conn
+                        )
+                        if novo_treino_id_db:
+                            todos_ex_salvos_final_db = True
+                            for ex_info_final_db in st.session_state.exercicios_para_treino_atual:
+                                res_add_ex_final_db = database.add_exercise_to_treino(
+                                    novo_treino_id_db,
+                                    ex_info_final_db['exercicio_id'],
+                                    ex_info_final_db['series'],
+                                    ex_info_final_db['repeticoes'], # Certifique-se de que todos os argumentos posicionais e nomeados estão corretos
+                                    ex_info_final_db['carga'],
+                                    ex_info_final_db['descanso_segundos'],
+                                    ex_info_final_db['ordem'],
+                                    ex_info_final_db['observacoes_exercicio']
+                                    
+                            )
+                                if res_add_ex_final_db is None: 
+                                    todos_ex_salvos_final_db = False
+                                    st.error(f"Falha ao salvar o exercício '{ex_info_final_db['nome_exercicio']}' no treino ID {novo_treino_id_db}.")
+                                    break
+                            
+                            if todos_ex_salvos_final_db:
+                                st.success(f"Treino '{dados_treino_principal_final['nome_treino']}' e seus exercícios salvos com ID: {novo_treino_id_db}!")
+                                st.session_state.exercicios_para_treino_atual = []
+                                st.session_state.nome_treino_sendo_criado = ""
+                                st.session_state.dados_treino_principal_temp = {}
+                                st.session_state.proxima_ordem_exercicio = 1
+                                st.rerun()
+                            else:
+                                st.error(f"Alguns exercícios não puderam ser salvos. O treino principal foi criado (ID: {novo_treino_id_db}), mas pode estar incompleto.")
+                        else:
+                            st.error("Falha ao salvar os dados do treino principal.")
+
+        with tab_banco_exercicios:
+            st.subheader("Banco Global de Exercícios")
+            try:
+                exercicios_globais_data = database.get_all_exercises()
+                if exercicios_globais_data:
+                    df_ex_globais = pd.DataFrame(exercicios_globais_data)
+                    st.dataframe(df_ex_globais[['id', 'nome', 'grupo_muscular']], use_container_width=True, hide_index=True)
+                else:
+                    st.info("Nenhum exercício no banco global.")
+            except Exception as e:
+                st.error(f"Erro ao carregar banco de exercícios: {e}")
+
+            with st.expander("➕ Adicionar Novo Exercício ao Banco Global"):
+                with st.form("form_novo_exercicio_global_tab"):
+                    form_nome_ex_g_val = st.text_input("Nome do Exercício*")
+                    form_grupo_musc_ex_g_val = st.text_input("Grupo Muscular")
+                    submit_ex_g_form = st.form_submit_button("Salvar Exercício Global")
+
+                    if submit_ex_g_form:
+                        if not form_nome_ex_g_val:
+                            st.warning("Nome do exercício é obrigatório.")
+                        else:
+                            novo_ex_g_id_db = database.add_exercise(form_nome_ex_g_val, form_grupo_musc_ex_g_val, conn_externa=conn)
+                            if novo_ex_g_id_db:
+                                st.success(f"Exercício '{form_nome_ex_g_val}' adicionado ao banco global com ID: {novo_ex_g_id_db}!")
+                                st.rerun()
+                            else:
+                                st.error("Falha ao adicionar exercício global. Verifique se já existe.")
+        
 
     elif pagina_atual == "Pagamentos":
         st.title("💳 Pagamentos")
         st.header("Gerenciamento de Pagamentos")
-        # ... (seu código para a página de Pagamentos) ...
+        
+        tab_ver_pagamentos, tab_registrar_pagamento = st.tabs(["Consultar Pagamentos", "Registrar Novo Pagamento"])
+        with tab_ver_pagamentos:
+            st.subheader("Consultar Pagamentos de Clientes")
+            try:
+                clientes_select_pag = database.get_all_clients_for_select()
+                op_cli_pag = {"-- Selecione um Cliente --": None}
+                if clientes_select_pag:
+                    for c in clientes_select_pag: op_cli_pag[c['nome']] = c['id']
+                
+                cliente_nome_pag_sel = st.selectbox("Cliente:", list(op_cli_pag.keys()), key="sel_cliente_pag")
+
+                if cliente_nome_pag_sel != "-- Selecione um Cliente --":
+                    cliente_id_pag = op_cli_pag.get(cliente_nome_pag_sel) 
+                    if cliente_id_pag:
+                        st.markdown(f"#### Histórico de Pagamentos de: **{cliente_nome_pag_sel}**")
+                        pagamentos_cliente = database.get_pagamentos_by_client_id(cliente_id_pag)
+                        if pagamentos_cliente:
+                            df_pag = pd.DataFrame(pagamentos_cliente)
+                            df_pag['pago'] = df_pag['pago'].apply(lambda x: "Sim" if x == 1 else "Não")
+                            st.dataframe(df_pag[['data_pagamento', 'valor', 'pago']], hide_index=True, use_container_width=True)
+                        else:
+                            st.info("Nenhum pagamento registrado para este cliente.")
+
+                        stats_pag = database.get_payment_stats_for_client(cliente_id_pag)
+                        st.metric("Total Pago", f"R$ {stats_pag.get('total_pago', 0):.2f}")
+                        if stats_pag.get('ultimo_pagamento_data'):
+                            data_ult_pag = pd.to_datetime(stats_pag['ultimo_pagamento_data']).strftime('%d/%m/%Y') if stats_pag['ultimo_pagamento_data'] else "N/A"
+                            st.write(f"Último Pagamento: R$ {stats_pag.get('ultimo_pagamento_valor', 0):.2f} em {data_ult_pag}")
+                            
+            except Exception as e:
+                st.error(f"Erro ao carregar dados de pagamentos: {e}")
+                
+        with tab_registrar_pagamento:
+            st.subheader("Registrar Novo Pagamento")
+            op_cli_reg_pag = {"-- Selecione um Cliente --": None}
+            try:
+                clientes_select_reg_pag = database.get_all_clients_for_select()
+                if clientes_select_reg_pag:
+                    for c in clientes_select_reg_pag: op_cli_reg_pag[c['nome']] = c['id']
+            except Exception as e:
+                st.error(f"Erro ao carregar clientes para registro de pagamento: {e}")
+                
+            with st.form("form_novo_pagamento"):
+                cliente_nome_reg_pag_sel = st.selectbox("Cliente*", list(op_cli_reg_pag.keys()), key="sel_cliente_reg_pag")
+                data_pag_form = st.date_input("Data do Pagamento*", value=date.today())
+                valor_pag_form = st.number_input("Valor Pago (R$)*", min_value=0.01, format="%.2f")
+                status_pago_form = st.checkbox("Pagamento Confirmado (Pago)?", value=True)
+                
+                submit_pag = st.form_submit_button("Registrar Pagamento")
+
+                if submit_pag:
+                    if cliente_nome_reg_pag_sel == "-- Selecione um Cliente --":
+                        st.warning("Selecione um cliente.")
+                    elif not valor_pag_form or valor_pag_form <=0:
+                        st.warning("Informe um valor válido para o pagamento.")
+                    else:
+                        cliente_id_reg_pag = op_cli_reg_pag.get(cliente_nome_reg_pag_sel) 
+                        if cliente_id_reg_pag:
+                            pago_status_db = 1 if status_pago_form else 0
+                            
+                            novo_pag_id = database.add_pagamento(cliente_id_reg_pag, data_pag_form.isoformat(), valor_pag_form, pago_status_db)
+                            if novo_pag_id:
+                                st.success(f"Pagamento de R$ {valor_pag_form:.2f} para '{cliente_nome_reg_pag_sel}' registrado com ID: {novo_pag_id}!")
+                                st.rerun()
+                            else:
+                                st.error("Falha ao registrar pagamento.")
+                        else:
+                            st.error("Cliente selecionado para pagamento não encontrado.")
+            
 
     elif pagina_atual == "Configurações Admin":
         st.title("⚙️ Configurações Administrativas")
