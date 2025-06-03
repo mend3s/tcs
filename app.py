@@ -107,15 +107,104 @@ if st.session_state["authentication_status"]:
     if pagina_atual == "Dashboard":
         st.title("🏠 Dashboard")
         st.header(f"Olá, {st.session_state['name']}!") 
-        #     clientes_data = database.get_all_clients()
-        #     if clientes_data:
-        #         df = pd.DataFrame(clientes_data)
-        #         st.subheader("Alguns Clientes:")
-        #         st.dataframe(df[['id', 'nome', 'email']].head(), use_container_width=True, hide_index=True)
-        # except ImportError:
-        #     st.warning("Módulo 'database' não encontrado para carregar dados no dashboard.")
-        # except Exception as e:
-        #     st.error(f"Erro ao carregar dados para o dashboard: {e}")
+total_clientes = database.count_total_clients()
+        total_instrutores = database.count_total_intrutores()
+        dados_planos = database.count_clientes_por_plano()
+        totalpago = database.count_pagamentosn()
+
+            # Definindo o estilo do card
+        col1, col2 = st.columns(2)
+        # Construir a lista de planos em HTML para dentro do card
+        lista_html_interna = ""
+        if dados_planos:
+            lista_html_interna += "<ul style='list-style-type: none; padding-top: 8px; padding-left: 20px; margin: 0; text-align: left;'>" # Corrigido pading_top e adicionado padding-left
+            for item in dados_planos:
+                lista_html_interna += f"<li style='color: white; margin-bottom: 5px; font-size: 1em;'><strong>{item['nome_plano']}:</strong> {item['total_clientes']} ativos</li>" # Ajustado margin e font-size
+            lista_html_interna += "</ul>"
+        else:
+            lista_html_interna = "<p style='color: white; text-align: center;'>Nenhum dado de plano encontrado.</p>"
+
+# Criando as colunas para os dois primeiros cards
+        col1, col2 = st.columns(2)
+
+        with col1:
+                card_clientes = f"""
+                <div style="
+                    background-color: #ABDDA4; 
+                padding: 16px; 
+                border-radius: 16px; /* Arredondamento mais comum */
+                color: white; 
+                text-align: center; 
+                box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2); 
+                max-width: 300px; 
+                margin: 16px auto;
+                ">
+                    <h2 style="color: white; margin-bottom: 10px; font-size: 1.5em; border-bottom: 1px solid rgba(255,255,255,0.3);text-align: center;">CLIENTES ATIVOS</h2>
+                    <h1 style="color: white; margin-top: 0px; font-size: 2.5em;text-align: center;">{total_clientes}</h1>
+                </div>
+                """
+                st.markdown(card_clientes, unsafe_allow_html=True)
+
+        with col2:
+                card_instrutores = f"""
+                <div style="
+                    background-color: #D53E4F; 
+                padding: 16px; 
+                border-radius: 25px; /* Arredondamento mais comum */
+                color: white; 
+                text-align: center; 
+                box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2); 
+                max-width: 300px; 
+                margin: 16px auto;
+                ">
+                    <h2 style="color: white; margin-bottom: 10px; font-size: 1.5em; border-bottom: 1px solid rgba(255,255,255,0.3);text-align: center;">INSTRUTORES ATIVOS</h2>
+                    <h1 style="color: white; margin-top: 0px; font-size: 2.5em; text-align: center;">{total_instrutores}</h1>
+                </div>
+                """
+                st.markdown(card_instrutores, unsafe_allow_html=True)
+
+        st.markdown("---") # Linha divisória
+
+            # Card para Clientes por Plano
+        card_clientes_por_plano = f"""
+            <div style="
+                background-color: #66C5CC; 
+                padding: 16px; 
+                border-radius: 25px; /* Arredondamento mais comum */
+                color: white; 
+                text-align: center;  
+                box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2); 
+                max-width: 300px; 
+                margin: 16px auto;
+            ">
+                <h2 style="color: white; margin-bottom: 10px; text-align: center; font-size: 2em; border-bottom: 1px solid rgba(255,255,255,0.3);">CLIENTES & PLANOS</h2>
+                <div style="margin-top: 10px; text-align: center;">
+                    {lista_html_interna}
+                </div>
+            </div>    
+            """
+        st.markdown(card_clientes_por_plano, unsafe_allow_html=True)
+
+        st.markdown("---")
+
+        card_pagamentos = f"""
+            <div style="
+                background-color: #CC99FF; 
+                padding: 16px; 
+                border-radius: 25px; /* Arredondamento mais comum */
+                color: white; 
+                text-align: center;  
+                box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2); 
+                max-width: 300px; 
+                margin: 16px auto;
+            ">
+                <h2 style="color: white; margin-bottom: 10px; text-align: center; font-size: 2em; border-bottom: 1px solid rgba(255,255,255,0.3);">PAGAMENTO PENDENTE</h2>
+                <h1 style="margin-top: 10px; text-align: center;"> {totalpago}</h1>
+            </div>    
+            """
+        st.markdown(card_pagamentos, unsafe_allow_html=True)
+
+
     elif pagina_atual == "Clientes":
         st.title("👨‍💻 Gestão de Clientes")
         st.markdown("Gerencie os clientes da sua academia: visualize, adicione e veja seus planos.")
